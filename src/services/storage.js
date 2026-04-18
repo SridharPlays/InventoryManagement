@@ -47,5 +47,31 @@ export const StorageService = {
     } catch (error) {
       console.error('Error clearing cache:', error);
     }
+  },
+  addToOfflineQueue: async (queueName, data) => {
+    try {
+      const existingQueue = await AsyncStorage.getItem(`@queue_${queueName}`);
+      const queue = existingQueue ? JSON.parse(existingQueue) : [];
+      queue.push(data);
+      await AsyncStorage.setItem(`@queue_${queueName}`, JSON.stringify(queue));
+    } catch (error) {
+      console.error(`Error adding to offline queue ${queueName}`, error);
+    }
+  },
+  getOfflineQueue: async (queueName) => {
+    try {
+      const queue = await AsyncStorage.getItem(`@queue_${queueName}`);
+      return queue ? JSON.parse(queue) : [];
+    } catch (error) {
+      console.error(`Error getting offline queue ${queueName}`, error);
+      return [];
+    }
+  },
+  clearOfflineQueue: async (queueName) => {
+    try {
+      await AsyncStorage.removeItem(`@queue_${queueName}`);
+    } catch (error) {
+      console.error(`Error clearing queue ${queueName}`, error);
+    }
   }
 };

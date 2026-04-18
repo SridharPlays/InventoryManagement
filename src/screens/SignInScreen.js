@@ -1,27 +1,81 @@
-import React, { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  ActivityIndicator,
-  Alert
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+
+// Google Auth Imports
+import * as AuthSession from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+
 import { COLORS } from '../constants/theme';
 import { postToGAS } from '../services/api';
-import { StorageService } from '../services/storage';
 
-export default function SignInScreen({ setToken }) {
+// Required to handle the redirect back to the app from the browser
+WebBrowser.maybeCompleteAuthSession();
+
+export default function SignInScreen({ setToken, setUserData }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setPasswordVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [request, googleResponse, promptAsync] = Google.useAuthRequest({
+    iosClientId: '695463828535-ph4hvso1hi5s38kp9sgeieiq22atshmn.apps.googleusercontent.com',
+    androidClientId: '695463828535-c8kcabcbts2l2b8l1r2lfpgqp3ke610o.apps.googleusercontent.com',
+    webClientId: '695463828535-0jdevib60jm9bhnr3l3r5frdsrdvqtaq.apps.googleusercontent.com',
+    redirectUri: AuthSession.makeRedirectUri({
+    projectSettings: {
+      baseUrl: 'https://auth.expo.io/@sridharplays/InventoryExpo'
+    },
+    useProxy: true
+  }),
+  });
+
+  // 2. Listen for Google Auth Response
+  useEffect(() => {
+    if (googleResponse?.type === 'success') {
+      const { authentication } = googleResponse;
+      // You can use authentication.accessToken or authentication.idToken 
+      // depending on your backend verification method
+      handleSocialLogin('google', authentication.accessToken);
+    }
+  }, [googleResponse]);
+
+  // Unified Social Login Handler
+  const handleSocialLogin = async (provider, token) => {
+    setIsLoading(true);
+    try {
+      // Sending the provider and token to your GAS backend
+      const response = await postToGAS('social_login', { provider, token });
+
+      if (response && response.success) {
+        await AsyncStorage.setItem('userToken', response.sessionId);
+        await AsyncStorage.setItem('userData', JSON.stringify(response.user));
+        setUserData(response.user);
+        setToken(response.sessionId);
+      } else {
+        Alert.alert("Login Failed", response.message || "Social login failed.");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Could not connect to the server.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Original Email/Password Handler
   const handleSignIn = async () => {
     if (!email || !password) {
       Alert.alert("Error", "Please fill in all fields.");
@@ -29,28 +83,27 @@ export default function SignInScreen({ setToken }) {
     }
 
     setIsLoading(true);
-    
-    // Call the actual GAS Backend
     const response = await postToGAS('login', { email, password });
-    
     setIsLoading(false);
 
     if (response && response.success) {
-      // Create session from response data
-      const userData = response.user || { email: email, name: "Sridhar N" };
-      await StorageService.saveSession(userData);
-      setToken(userData); // This triggers the navigation to the Dashboard tabs
+      await AsyncStorage.setItem('userToken', response.sessionId);
+      await AsyncStorage.setItem('userData', JSON.stringify(response.user));
+      setUserData(response.user);
+      setToken(response.sessionId);
     } else {
-      Alert.alert("Login Failed", response?.message || "Invalid credentials or network error.");
+      Alert.alert("Login Failed", response.message || "Invalid credentials");
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} scrollEnabled={false}>
+      <ScrollView contentContainerStyle={styles.scrollContent} scrollEnabled={true}>
         <View style={styles.headerCentered}>
-          {/* Note: Ensure the image path is correct relative to this file */}
-          <Image source={require("../../assets/images/caps.png")} style={{ width: 250, height: 100, resizeMode: 'contain' }} />
+          <Image 
+            source={require("../../assets/images/caps.png")} 
+            style={{ width: 250, height: 100, resizeMode: 'contain' }} 
+          />
         </View>
 
         <Text style={[styles.title, { marginBottom: 20 }]}>Sign In To Your Account.</Text>
@@ -91,8 +144,8 @@ export default function SignInScreen({ setToken }) {
           </View>
         </View>
 
-        <TouchableOpacity 
-          style={[styles.primaryButton, { marginTop: 10 }, isLoading && { opacity: 0.7 }]} 
+        <TouchableOpacity
+          style={[styles.primaryButton, { marginTop: 10 }, isLoading && { opacity: 0.7 }]}
           onPress={handleSignIn}
           disabled={isLoading}
         >
@@ -115,7 +168,12 @@ export default function SignInScreen({ setToken }) {
           <View style={styles.dividerLine} />
         </View>
 
-        <TouchableOpacity style={styles.socialButton} onPress={() => Alert.alert("Google Sign-In", "Google Sign-In is not implemented in this demo.")}>
+        {/* Google Sign-In Button */}
+        <TouchableOpacity 
+          style={styles.socialButton} 
+          disabled={!request || isLoading} 
+          onPress={() => promptAsync()}
+        >
           <Image
             source={{ uri: 'https://img.icons8.com/?size=100&id=17949&format=png&color=000000' }}
             style={styles.socialIcon}
@@ -123,7 +181,10 @@ export default function SignInScreen({ setToken }) {
           <Text style={styles.socialButtonText}>Sign in with Google</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.socialButton} onPress={() => Alert.alert("Apple Sign-In", "Apple Sign-In is not implemented in this demo.")}>
+        <TouchableOpacity 
+          style={styles.socialButton} 
+          onPress={() => Alert.alert("Apple Sign-In", "Apple Sign-In configuration required.")}
+        >
           <Ionicons name="logo-apple" size={20} color={COLORS.text} style={{ marginRight: 10 }} />
           <Text style={styles.socialButtonText}>Continue with Apple</Text>
         </TouchableOpacity>

@@ -2,10 +2,11 @@
   "expo": {
     "name": "CAPS",
     "slug": "InventoryExpo",
+    "owner": "sridharplays",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/caps_logo.png",
-    "scheme": "inventoryexpo",
+    "scheme": "inventory-expo",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
@@ -44,7 +45,13 @@
           }
         }
       ],
-      "@react-native-firebase/app"
+      "@react-native-firebase/app",
+      "expo-web-browser",
+      // [
+      // "@react-native-google-signin/google-signin",
+      //   {
+      //     "iosUrlScheme": "com.googleusercontent.apps.695463828535-ph4hvso1hi5s38kp9sgeieiq22atshmn"
+      //   }]
     ],
     "experiments": {
       "typedRoutes": true,

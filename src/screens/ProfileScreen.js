@@ -1,16 +1,14 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useState } from 'react';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { COLORS } from '../constants/theme';
 import { StorageService } from '../services/storage';
 
-import { AuthContext } from '../navigation/AppNavigator';
-
-export default function ProfileScreen({ navigation }) {
-  const [userData, setUserData] = useState({ name: 'Loading...', email: 'Loading...' });
-  const { signOut } = useContext(AuthContext);
-
+// Notice we added setToken here!
+export default function ProfileScreen({ userData, setToken }) {
   // State for Modals
   const [contactModalVisible, setContactModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
@@ -18,18 +16,6 @@ export default function ProfileScreen({ navigation }) {
 
   // State for Toggle Preference
   const [mailEnabled, setMailEnabled] = useState(true);
-
-  useEffect(() => {
-    const loadSession = async () => {
-      const session = await StorageService.getSession();
-      if (session) {
-        setUserData(session);
-      } else {
-        setUserData({ name: 'Guest User', email: 'No email found' });
-      }
-    };
-    loadSession();
-  }, []);
 
   const handleLogout = async () => {
     Alert.alert(
@@ -41,14 +27,15 @@ export default function ProfileScreen({ navigation }) {
           text: "Log Out",
           style: "destructive",
           onPress: async () => {
-            signOut();
+            await AsyncStorage.removeItem('userToken');
+            await AsyncStorage.removeItem('userData');
+            setToken(null); // This instantly kicks the user back to the SignIn screen!
           }
         }
       ]
     );
   };
 
-  // --- NEW: Clear Cache Logic ---
   const handleClearCache = async () => {
     Alert.alert(
       "Clear Cache",
@@ -72,7 +59,6 @@ export default function ProfileScreen({ navigation }) {
     );
   };
 
-  // Demo function to save preferences
   const handleSavePreferences = () => {
     Alert.alert(
       "Preferences Saved",
@@ -103,19 +89,18 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.headerTitle}>Profile</Text>
         </View>
 
-        {/* Made the User Card clickable */}
         <TouchableOpacity 
           style={styles.userCard} 
           onPress={() => setPreferencesModalVisible(true)}
         >
           <View style={styles.avatarPlaceholder}>
             <Text style={{ color: COLORS.text, fontSize: 20, fontWeight: 'bold' }}>
-              {userData.name && userData.name !== 'Loading...' ? userData.name.charAt(0).toUpperCase() : <Ionicons name="person" size={24} color={COLORS.textMuted} />}
+              {userData?.name ? userData.name.charAt(0).toUpperCase() : <Ionicons name="person" size={24} color={COLORS.textMuted} />}
             </Text>
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>{userData.name || 'Sridhar N'}</Text>
-            <Text style={styles.userEmail}>{userData.email || 'sridhar.n@christuniversity.in'}</Text>
+            <Text style={styles.userName}>{userData?.name || 'Guest User'}</Text>
+            <Text style={styles.userEmail}>{userData?.email || 'No email found'}</Text>
           </View>
           <Ionicons name="create-outline" size={20} color={COLORS.textMuted} />
         </TouchableOpacity>
@@ -143,7 +128,6 @@ export default function ProfileScreen({ navigation }) {
         </View>
 
         <View style={[styles.cardGroup, { marginTop: 20 }]}>
-          {/* UPDATED: Clear Cache Button */}
           <TouchableOpacity style={styles.profileItem} onPress={handleClearCache}>
             <View style={styles.profileItemLeft}>
               <View style={styles.iconBox}>
@@ -165,16 +149,10 @@ export default function ProfileScreen({ navigation }) {
       </ScrollView>
 
       {/* Preferences Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={preferencesModalVisible}
-        onRequestClose={() => setPreferencesModalVisible(false)}
-      >
+      <Modal animationType="slide" transparent={true} visible={preferencesModalVisible} onRequestClose={() => setPreferencesModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>User Preferences</Text>
-            
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>Mail Notifications</Text>
               <Switch
@@ -185,18 +163,11 @@ export default function ProfileScreen({ navigation }) {
                 value={mailEnabled}
               />
             </View>
-
             <View style={styles.modalActionRow}>
-              <TouchableOpacity
-                style={[styles.modalButtonBase, styles.modalButtonCancel]}
-                onPress={() => setPreferencesModalVisible(false)}
-              >
+              <TouchableOpacity style={[styles.modalButtonBase, styles.modalButtonCancel]} onPress={() => setPreferencesModalVisible(false)}>
                 <Text style={styles.modalButtonCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButtonBase, styles.modalButtonPrimary]}
-                onPress={handleSavePreferences}
-              >
+              <TouchableOpacity style={[styles.modalButtonBase, styles.modalButtonPrimary]} onPress={handleSavePreferences}>
                 <Text style={styles.modalButtonText}>Save</Text>
               </TouchableOpacity>
             </View>
@@ -205,20 +176,12 @@ export default function ProfileScreen({ navigation }) {
       </Modal>
 
       {/* Contact Us Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={contactModalVisible}
-        onRequestClose={() => setContactModalVisible(false)}
-      >
+      <Modal animationType="slide" transparent={true} visible={contactModalVisible} onRequestClose={() => setContactModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Contact Us</Text>
             <Text style={styles.modalText}>You can reach us at caps@christuniversity.in</Text>
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => setContactModalVisible(false)}
-            >
+            <TouchableOpacity style={styles.modalButton} onPress={() => setContactModalVisible(false)}>
               <Text style={styles.modalButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
@@ -226,20 +189,12 @@ export default function ProfileScreen({ navigation }) {
       </Modal>
 
       {/* Help & Support Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={helpModalVisible}
-        onRequestClose={() => setHelpModalVisible(false)}
-      >
+      <Modal animationType="slide" transparent={true} visible={helpModalVisible} onRequestClose={() => setHelpModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Help & Support</Text>
             <Text style={styles.modalText}>Need assistance? Contact your Team Lead or Administrator.</Text>
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => setHelpModalVisible(false)}
-            >
+            <TouchableOpacity style={styles.modalButton} onPress={() => setHelpModalVisible(false)}>
               <Text style={styles.modalButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
@@ -270,89 +225,17 @@ const styles = StyleSheet.create({
   profileItemRight: { flexDirection: 'row', alignItems: 'center' },
   profileItemValue: { color: COLORS.textMuted, fontSize: 13, marginRight: 8 },
   itemDivider: { height: 1, backgroundColor: COLORS.border, marginLeft: 60 },
-
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    width: '80%',
-    backgroundColor: COLORS.card || '#FFF',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 15,
-  },
-  modalText: {
-    fontSize: 15,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 22,
-  },
-  modalButton: {
-    backgroundColor: COLORS.primary || '#007BFF',
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    width: '100%',
-    alignItems: 'center',
-  },
-  modalButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
-    marginBottom: 25,
-    marginTop: 10,
-  },
-  switchLabel: {
-    fontSize: 16,
-    color: COLORS.text,
-    fontWeight: '500',
-  },
-  modalActionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    gap: 12,
-  },
-  modalButtonBase: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalButtonCancel: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.border || '#E5E7EB',
-  },
-  modalButtonPrimary: {
-    backgroundColor: COLORS.primary || '#007BFF',
-  },
-  modalButtonCancelText: {
-    color: COLORS.textMuted || '#6B7280',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+  modalContent: { width: '80%', backgroundColor: COLORS.card || '#FFF', borderRadius: 16, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.text, marginBottom: 15 },
+  modalText: { fontSize: 15, color: COLORS.textMuted, textAlign: 'center', marginBottom: 20, lineHeight: 22 },
+  modalButton: { backgroundColor: COLORS.primary || '#007BFF', paddingVertical: 10, paddingHorizontal: 24, borderRadius: 8, width: '100%', alignItems: 'center' },
+  modalButtonText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
+  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 25, marginTop: 10 },
+  switchLabel: { fontSize: 16, color: COLORS.text, fontWeight: '500' },
+  modalActionRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', gap: 12 },
+  modalButtonBase: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  modalButtonCancel: { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.border || '#E5E7EB' },
+  modalButtonPrimary: { backgroundColor: COLORS.primary || '#007BFF' },
+  modalButtonCancelText: { color: COLORS.textMuted || '#6B7280', fontSize: 16, fontWeight: '600' },
 });
