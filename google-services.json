@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "71124286823",
+    "project_id": "capsinventory-bc358",
+    "storage_bucket": "capsinventory-bc358.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:71124286823:android:6eae20a50e87a50494c3c2",
+        "android_client_info": {
+          "package_name": "com.caps.inventory"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_zvoRPjassFpK7V5LucGA4QBbE5wAo7k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
