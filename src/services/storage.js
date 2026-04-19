@@ -42,7 +42,6 @@ export const StorageService = {
   },
   removeCachedData: async (key) => {
     try {
-      // If you are using AsyncStorage:
       await AsyncStorage.removeItem(key); 
     } catch (error) {
       console.error('Error clearing cache:', error);

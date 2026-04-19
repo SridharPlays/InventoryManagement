@@ -52,6 +52,8 @@ export default function ProfileScreen({ userData, setToken }) {
         onPress: async () => {
           await AsyncStorage.removeItem('userToken');
           await AsyncStorage.removeItem('userData');
+
+          await StorageService.clearSession();
           setToken(null); 
         }
       }

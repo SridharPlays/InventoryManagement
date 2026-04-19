@@ -14,6 +14,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { StorageService } from '../services/storage';
+
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+
 // Google Auth Imports
 import * as AuthSession from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
@@ -24,6 +30,14 @@ import { postToGAS } from '../services/api';
 
 // Required to handle the redirect back to the app from the browser
 WebBrowser.maybeCompleteAuthSession();
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 export default function SignInScreen({ setToken, setUserData }) {
   const [email, setEmail] = useState('');
@@ -36,12 +50,51 @@ export default function SignInScreen({ setToken, setUserData }) {
     androidClientId: '695463828535-c8kcabcbts2l2b8l1r2lfpgqp3ke610o.apps.googleusercontent.com',
     webClientId: '695463828535-0jdevib60jm9bhnr3l3r5frdsrdvqtaq.apps.googleusercontent.com',
     redirectUri: AuthSession.makeRedirectUri({
-    projectSettings: {
-      baseUrl: 'https://auth.expo.io/@sridharplays/InventoryExpo'
-    },
-    useProxy: true
-  }),
+      projectSettings: {
+        baseUrl: 'https://auth.expo.io/@sridharplays/InventoryExpo'
+      },
+      useProxy: true
+    }),
   });
+
+  const registerForPushNotificationsAsync = async (userEmail) => {
+    let token;
+
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: COLORS.primary,
+      });
+    }
+
+    if (Device.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        console.log('Failed to get push token for push notification!');
+        return;
+      }
+
+      // Get the token
+      token = (await Notifications.getExpoPushTokenAsync({
+        projectId: "92035d82-8cf0-401b-84f7-036ec1ba73dc"
+      })).data;
+
+      // Send token to your Google Apps Script backend
+      await postToGAS('savePushToken', { email: userEmail, token: token });
+
+    } else {
+      console.log('Must use physical device for Push Notifications');
+    }
+  };
 
   // 2. Listen for Google Auth Response
   useEffect(() => {
@@ -65,6 +118,13 @@ export default function SignInScreen({ setToken, setUserData }) {
         await AsyncStorage.setItem('userData', JSON.stringify(response.user));
         setUserData(response.user);
         setToken(response.sessionId);
+
+        await StorageService.setSession({
+          sessionId: response.sessionId,
+          user: response.user,
+          email: response.user.email
+        });
+
       } else {
         Alert.alert("Login Failed", response.message || "Social login failed.");
       }
@@ -89,8 +149,14 @@ export default function SignInScreen({ setToken, setUserData }) {
     if (response && response.success) {
       await AsyncStorage.setItem('userToken', response.sessionId);
       await AsyncStorage.setItem('userData', JSON.stringify(response.user));
-      setUserData(response.user);
-      setToken(response.sessionId);
+
+      if (setUserData) setUserData(response.user);
+      if (setToken) setToken(response.sessionId);
+
+      await StorageService.saveSession(response.user);
+
+      registerForPushNotificationsAsync(response.user.email);
+
     } else {
       Alert.alert("Login Failed", response.message || "Invalid credentials");
     }
@@ -100,9 +166,9 @@ export default function SignInScreen({ setToken, setUserData }) {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} scrollEnabled={true}>
         <View style={styles.headerCentered}>
-          <Image 
-            source={require("../../assets/images/caps.png")} 
-            style={{ width: 250, height: 100, resizeMode: 'contain' }} 
+          <Image
+            source={require("../../assets/images/caps.png")}
+            style={{ width: 250, height: 100, resizeMode: 'contain' }}
           />
         </View>
 
@@ -169,9 +235,9 @@ export default function SignInScreen({ setToken, setUserData }) {
         </View>
 
         {/* Google Sign-In Button */}
-        <TouchableOpacity 
-          style={styles.socialButton} 
-          disabled={!request || isLoading} 
+        <TouchableOpacity
+          style={styles.socialButton}
+          disabled={!request || isLoading}
           onPress={() => promptAsync()}
         >
           <Image
@@ -181,8 +247,8 @@ export default function SignInScreen({ setToken, setUserData }) {
           <Text style={styles.socialButtonText}>Sign in with Google</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.socialButton} 
+        <TouchableOpacity
+          style={styles.socialButton}
           onPress={() => Alert.alert("Apple Sign-In", "Apple Sign-In configuration required.")}
         >
           <Ionicons name="logo-apple" size={20} color={COLORS.text} style={{ marginRight: 10 }} />

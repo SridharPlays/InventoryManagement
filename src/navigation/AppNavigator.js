@@ -129,7 +129,7 @@ export default function AppNavigator() {
               <SignInScreen
                 {...props}
                 setToken={setUserToken}
-                setUserData={setUserData} // Pass this so login can update the role!
+                setUserData={setUserData}
               />
             )}
           </Stack.Screen>

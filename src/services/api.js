@@ -2,7 +2,7 @@ import { StorageService } from './storage';
 
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzyURMe1zXn5zccSycaStmH4OCVb4WWTDI2kLIroL03lPDMyoQM0XvJouiJbBilqWQ7/exec';
 
-// --- GET REQUESTS (Existing) ---
+// GET Requests
 export const fetchFromGAS = async (action) => {
   try {
     const response = await fetch(`${GAS_URL}?action=${action}`);
@@ -19,16 +19,14 @@ export const fetchFromGAS = async (action) => {
   }
 };
 
-// --- POST REQUESTS (New) ---
+// POST Requests
 export const postToGAS = async (action, payload = {}) => {
   try {
     const response = await fetch(GAS_URL, {
       method: 'POST',
       headers: {
-        // text/plain avoids CORS OPTIONS preflight block in GAS
         'Content-Type': 'text/plain;charset=utf-8', 
       },
-      // Merge the action into the payload body for your switch statement
       body: JSON.stringify({ action, ...payload }),
       redirect: 'follow' 
     });
