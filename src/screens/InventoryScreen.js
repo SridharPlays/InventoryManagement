@@ -1,17 +1,27 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { 
-  View, Text, StyleSheet, RefreshControl, TouchableOpacity, 
-  TextInput, Modal, Image, FlatList, ScrollView, Alert, ActivityIndicator
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Modal,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { COLORS } from '../constants/theme';
 import { fetchFromGAS, postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 
-// --- CUSTOM INLINE DROPDOWN COMPONENT ---
+// CUSTOM INLINE DROPDOWN COMPONENT
 const CustomDropdown = ({ label, options, selectedValue, onSelect, placeholder }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -65,7 +75,7 @@ export default function InventoryScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [isGrid, setIsGrid] = useState(false);
 
-  // --- FILTER STATES ---
+  // FILTER STATES
   const [searchQuery, setSearchQuery] = useState('');
   const [isFilterModalVisible, setFilterModalVisible] = useState(false);
   const [activeFloor, setActiveFloor] = useState('');
@@ -73,10 +83,10 @@ export default function InventoryScreen({ navigation }) {
   const [tempFloor, setTempFloor] = useState('');
   const [tempCupboard, setTempCupboard] = useState('');
   
-  // --- ITEM INTERACTION STATES ---
+  // ITEM INTERACTION STATES
   const [selectedItem, setSelectedItem] = useState(null); // For regular tap (View Only)
   
-  // --- EDIT STATES ---
+  // EDIT STATES
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -97,7 +107,7 @@ export default function InventoryScreen({ navigation }) {
 
   useEffect(() => { loadData(false); }, [loadData]);
 
-  // --- DYNAMIC OPTIONS GENERATOR ---
+  // DYNAMIC OPTIONS GENERATOR
   const uniqueCategories = useMemo(() => Array.from(new Set(items.map(i => i.category).filter(Boolean))).sort(), [items]);
   const uniqueFloors = useMemo(() => Array.from(new Set(items.map(i => i.location).filter(Boolean))).sort(), [items]);
   
@@ -111,7 +121,7 @@ export default function InventoryScreen({ navigation }) {
     return Array.from(new Set(relevantItems.map(item => item.cupboard).filter(Boolean))).sort((a, b) => a.toString().localeCompare(b.toString(), undefined, { numeric: true }));
   }, [items, editForm?.location]);
 
-  // --- FILTER LOGIC ---
+  // FILTER LOGIC
   const filteredItems = useMemo(() => {
     return items.filter(item => {
       const matchesSearch = !searchQuery || 
@@ -128,7 +138,7 @@ export default function InventoryScreen({ navigation }) {
   const applyFilters = () => { setActiveFloor(tempFloor); setActiveCupboard(tempCupboard); setFilterModalVisible(false); };
   const clearFilters = () => { setTempFloor(''); setTempCupboard(''); setActiveFloor(''); setActiveCupboard(''); setFilterModalVisible(false); };
 
-  // --- NATIVE LONG PRESS ALERT ---
+  // NATIVE LONG PRESS ALERT
   const handleLongPress = (item) => {
     Alert.alert(
       item.itemName,
@@ -155,7 +165,7 @@ export default function InventoryScreen({ navigation }) {
     );
   };
 
-  // --- DELETE LOGIC ---
+  // DELETE LOGIC
   const handleDeleteConfirmation = (itemToDelete) => {
     Alert.alert("Delete", `Are you sure you want to delete ${itemToDelete.itemName}?`, [
       { text: "Cancel", style: "cancel" },
@@ -172,7 +182,7 @@ export default function InventoryScreen({ navigation }) {
     ]);
   };
 
-  // --- EDIT & SAVE LOGIC ---
+  // EDIT & SAVE LOGIC
   const handlePhotoUpdate = () => {
     Alert.alert("Update Item Photo", "Choose an option", [
       { text: "Take a Photo", onPress: openCamera },
@@ -541,7 +551,7 @@ const styles = StyleSheet.create({
   applyButton: { flex: 1, paddingVertical: 16, borderRadius: 12, backgroundColor: COLORS.primary, alignItems: 'center' },
   applyButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 
-  // --- NEW VERTICAL ACTION BUTTONS ---
+  // NEW VERTICAL ACTION BUTTONS
   verticalActionContainer: { gap: 10 },
   fullWidthButton: { paddingVertical: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   fullWidthButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },

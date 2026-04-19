@@ -1,15 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useMemo, useState } from 'react';
 import {
-    View, Text, StyleSheet, TextInput, TouchableOpacity,
-    FlatList, Alert, ActivityIndicator, Image, ScrollView
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image, ScrollView,
+    StyleSheet,
+    Text,
+    TextInput, TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
-import { StorageService } from '../services/storage';
 import { postToGAS } from '../services/api';
+import { StorageService } from '../services/storage';
 
-// --- CUSTOM INLINE DROPDOWN COMPONENT (Adapted for Selection) ---
+// CUSTOM INLINE DROPDOWN COMPONENT (Adapted for Selection)
 const CustomDropdown = ({ label, options, selectedValue, onSelect, placeholder }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -76,7 +82,7 @@ export default function RelocateScreen({ route, navigation }) {
         loadInventory();
     }, []);
 
-    // --- DYNAMIC DROPDOWN OPTIONS ---
+    // DYNAMIC DROPDOWN OPTIONS
     const uniqueLocations = useMemo(() => {
         const locs = new Set(items.map(item => item.location).filter(Boolean));
         return Array.from(locs).sort();
@@ -183,7 +189,7 @@ export default function RelocateScreen({ route, navigation }) {
             </View>
 
             {step === 1 ? (
-                // --- STEP 1: SELECT ITEMS ---
+                // STEP 1: SELECT ITEMS
                 <View style={{ flex: 1, paddingHorizontal: 16 }}>
                     <View style={styles.searchContainer}>
                         <Ionicons name="search" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
@@ -222,7 +228,7 @@ export default function RelocateScreen({ route, navigation }) {
                     )}
                 </View>
             ) : (
-                // --- STEP 2: SET DESTINATION ---
+                // STEP 2: SET DESTINATION
                 <ScrollView style={{ flex: 1, padding: 20 }} keyboardShouldPersistTaps="handled">
                     <View style={styles.summaryBox}>
                         <Ionicons name="information-circle" size={24} color={COLORS.primary} style={{ marginRight: 10 }} />

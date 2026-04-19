@@ -1,13 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  View, Text, StyleSheet, ScrollView, Switch, 
-  TouchableOpacity, ActivityIndicator, RefreshControl, Alert, TextInput 
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useCallback, useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
+import { fetchFromGAS, postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
-import { postToGAS, fetchFromGAS } from '../services/api';
 
 export default function AlertsScreen({ navigation }) {
   const [isLoading, setIsLoading] = useState(true);
@@ -70,7 +78,7 @@ export default function AlertsScreen({ navigation }) {
     loadAlertsData();
   }, []);
 
-  // --- PREFERENCES HANDLER ---
+  // PREFERENCES HANDLER
   const toggleEmailAlerts = async (newValue) => {
     if (!userEmail) return Alert.alert("Error", "Email not found. Please re-login.");
     setEmailAlertsEnabled(newValue); 
@@ -94,7 +102,7 @@ export default function AlertsScreen({ navigation }) {
     }
   };
 
-  // --- REQUEST NEGOTIATION HANDLERS ---
+  // REQUEST NEGOTIATION HANDLERS
   const handleExpandRequest = (req) => {
     if (expandedReq === req.row) {
       setExpandedReq(null); // Collapse if already open
@@ -137,7 +145,7 @@ export default function AlertsScreen({ navigation }) {
     }
   };
 
-  // --- UI COMPONENTS ---
+  // UI COMPONENTS
   const FilterChip = ({ label, active, type }) => (
     <TouchableOpacity 
       style={[styles.filterChip, active && styles.filterChipActive]}

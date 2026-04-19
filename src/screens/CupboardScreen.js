@@ -1,17 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  LayoutAnimation, 
-  Platform, 
-  UIManager,
-  Image
+import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
+import {
+    Image,
+    LayoutAnimation,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    UIManager,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
 import { StorageService } from '../services/storage';
 
@@ -49,7 +49,7 @@ const RackSection = ({ rackName, items }) => {
         <View style={styles.rackContent}>
           {items.map((item, i) => (
             <View key={i} style={styles.listCard}>
-              {/* --- ADDED IMAGE COMPONENT HERE --- */}
+              {/* ADDED IMAGE COMPONENT HERE */}
               <View style={styles.iconPlaceholder}>
                 <Image 
                   source={item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/caps_logo.png')} 

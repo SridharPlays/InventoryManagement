@@ -1,14 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  View, Text, StyleSheet, TextInput, TouchableOpacity, 
-  FlatList, Alert, ActivityIndicator, Image, ScrollView, Switch
+import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useMemo, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image, ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput, TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 
 import { COLORS } from '../constants/theme';
-import { StorageService } from '../services/storage';
 import { postToGAS } from '../services/api';
+import { StorageService } from '../services/storage';
 
 export default function IssueScreen({ route, navigation }) {
   // If navigating from Inventory screen, we might pass an initial item ID
@@ -163,7 +170,7 @@ export default function IssueScreen({ route, navigation }) {
       </View>
 
       {step === 1 ? (
-        // --- STEP 1: SELECT ITEM ---
+        // STEP 1: SELECT ITEM
         <View style={{ flex: 1, paddingHorizontal: 16 }}>
           <View style={styles.searchContainer}>
             <Ionicons name="search" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
@@ -185,7 +192,7 @@ export default function IssueScreen({ route, navigation }) {
           />
         </View>
       ) : (
-        // --- STEP 2: FILL ISSUE FORM ---
+        // STEP 2: FILL ISSUE FORM
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
           
           {/* Selected Item Summary Card */}

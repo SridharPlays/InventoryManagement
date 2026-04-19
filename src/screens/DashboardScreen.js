@@ -1,11 +1,17 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, RefreshControl,
-  TouchableOpacity, Modal, Alert
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+    Alert,
+    Modal,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import { fetchFromGAS, postToGAS } from '../services/api'; // <-- Added postToGAS
 import { StorageService } from '../services/storage';
@@ -59,7 +65,7 @@ export default function DashboardScreen() {
     loadData(false);
   }, [loadData]);
 
-  // --- NEW: IGNORE LOW STOCK LOGIC ---
+  // NEW: IGNORE LOW STOCK LOGIC
   const handleLongPressLowStock = (item) => {
     Alert.alert(
       "Ignore Low Stock?",
@@ -109,7 +115,7 @@ export default function DashboardScreen() {
     }
   };
 
-  // --- REUSABLE COMPONENTS ---
+  // REUSABLE COMPONENTS
   const ActionButton = ({ icon, label, onPress, color }) => (
     <TouchableOpacity
       style={[styles.actionButton, { backgroundColor: color + '15' }]}
@@ -157,7 +163,7 @@ export default function DashboardScreen() {
           <Text style={styles.headerTitle}>Dashboard</Text>
         </View>
 
-        {/* --- QUICK ACTIONS ROW --- */}
+        {/* QUICK ACTIONS ROW */}
         <View style={styles.quickActionsContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsScroll}>
             <ActionButton
@@ -238,7 +244,7 @@ export default function DashboardScreen() {
         )}
       </ScrollView>
 
-      {/* --- LOW STOCK MODAL --- */}
+      {/* LOW STOCK MODAL */}
       <Modal
         animationType="slide"
         transparent={true}

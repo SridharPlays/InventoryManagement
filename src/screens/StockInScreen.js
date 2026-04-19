@@ -24,6 +24,7 @@ import { StorageService } from '../services/storage';
 export default function StockInScreen() {
     // Mode State
     const [entryMode, setEntryMode] = useState('restock'); // 'restock' or 'expense'
+    const [userName, setUserName] = useState('');
 
     // Form State
     const [selectedItem, setSelectedItem] = useState(null); // Used for restock
@@ -47,7 +48,17 @@ export default function StockInScreen() {
     const [isLoading, setIsLoading] = useState(false);
     const [isOnline, setIsOnline] = useState(true);
 
-    useEffect(() => {
+    useEffect(() => async () => {
+        const userSession = await StorageService.getSession();
+        if (userSession) {
+            try {
+                const parsed = JSON.parse(userSession);
+                if (parsed && parsed.name) setUserName(parsed.name);
+            } catch (e) {
+                if (userSession.name) setUserName(userSession.name);
+            }
+        }
+
         const unsubscribe = NetInfo.addEventListener(state => {
             setIsOnline(state.isConnected);
             if (state.isConnected) syncOfflineData();
@@ -57,9 +68,7 @@ export default function StockInScreen() {
         return () => unsubscribe();
     }, []);
 
-    //--------------------------------------
-    // FETCH INVENTORY (Uses shared GAS_URL)
-    //--------------------------------------
+
     //--------------------------------------
     // FETCH INVENTORY (From Local Storage)
     //--------------------------------------
@@ -187,7 +196,7 @@ export default function StockInScreen() {
                     quantity: parseInt(quantity, 10),
                     invoiceUrl: uploadedImageUrl,
                     remarks: remarks,
-                    receivedBy: "App User" // Can be dynamically mapped if user auth context is added
+                    receivedBy: userName || "Unknown User",
                 };
 
                 // Step 3: Trigger GAS

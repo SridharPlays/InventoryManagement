@@ -1,32 +1,31 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, ActivityIndicator } from 'react-native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 
 import { COLORS } from '../constants/theme';
 
 // Screens
-import SignInScreen from '../screens/SignInScreen';
+import AlertsScreen from '../screens/AlertsScreen';
+import CupboardScreen from '../screens/CupboardScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import InventoryScreen from '../screens/InventoryScreen';
-import ScannerScreen from '../screens/ScannerScreen';
-import AlertsScreen from '../screens/AlertsScreen';
-import ProfileScreen from '../screens/ProfileScreen';
-import StockInScreen from '../screens/StockInScreen';
-import RequestItemScreen from '../screens/RequestItemScreen';
-import CupboardScreen from '../screens/CupboardScreen';
-import RelocateScreen from '../screens/RelocateScreen';
 import IssueScreen from '../screens/IssueScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import RelocateScreen from '../screens/RelocateScreen';
 import ReportScreen from '../screens/ReportScreen';
+import RequestItemScreen from '../screens/RequestItemScreen';
+import ScannerScreen from '../screens/ScannerScreen';
+import SignInScreen from '../screens/SignInScreen';
+import StockInScreen from '../screens/StockInScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-// --- BOTTOM TABS COMPONENT ---
-// We pass userData in as a prop so the tabs know who is looking at them
+// Bottom Tab Components
 function BottomTabs({ userData, setToken }) {
   const isAdmin = userData?.role === 'admin';
 
@@ -49,24 +48,24 @@ function BottomTabs({ userData, setToken }) {
         },
       })}
     >
-      {/* --- ADMIN ONLY TABS --- */}
+      {/* Admin only tabs */}
       {isAdmin && <Tab.Screen name="Dashboard" component={DashboardScreen} />}
       {isAdmin && <Tab.Screen name="Inventory" component={InventoryScreen} />}
 
-      {/* --- SHARED TAB --- */}
+      {/* shared tab */}
       <Tab.Screen name="Scan" component={ScannerScreen} />
 
-      {/* --- TL ONLY TAB --- */}
+      {/* TL ONLY TAB */}
       {!isAdmin && (
         <Tab.Screen name="Request">
           {(props) => <RequestItemScreen {...props} userData={userData} />}
         </Tab.Screen>
       )}
 
-      {/* --- ADMIN ONLY TAB --- */}
+      {/* ADMIN ONLY TAB */}
       {isAdmin && <Tab.Screen name="Alerts" component={AlertsScreen} />}
 
-      {/* --- SHARED TAB --- */}
+      {/* SHARED TAB */}
       <Tab.Screen name="Profile">
         {(props) => <ProfileScreen {...props} userData={userData} setToken={setToken} />}
       </Tab.Screen>
@@ -85,7 +84,7 @@ function BottomTabs({ userData, setToken }) {
   );
 }
 
-// --- MAIN NAVIGATOR ---
+// MAIN NAVIGATOR
 export default function AppNavigator() {
   const [isLoading, setIsLoading] = useState(true);
   const [userToken, setUserToken] = useState(null);

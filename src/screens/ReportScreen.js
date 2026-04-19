@@ -1,34 +1,44 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, Text, StyleSheet, TouchableOpacity, 
-  ScrollView, Alert, ActivityIndicator, Modal, FlatList 
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image // Added Image import
+  ,
+
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
-import { StorageService } from '../services/storage';
 import { postToGAS } from '../services/api';
+import { StorageService } from '../services/storage';
 
 import { MONTHS, YEARS } from '../constants/time';
-
-// --- MOCK DATA FOR DROPDOWNS ---
-const FLOORS = ['9th Floor', '10th Floor'];
-const CUPBOARDS = ['5', 'Cupboard B', 'Cupboard C', 'Cupboard D'];
 
 export default function ReportScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [inventory, setInventory] = useState([]);
   const [userEmail, setUserEmail] = useState("");
 
-  // --- PREVIEW MODAL STATES (For generated data) ---
+  // PREVIEW MODAL STATES (For generated data)
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [currentReportData, setCurrentReportData] = useState([]);
   const [currentReportTitle, setCurrentReportTitle] = useState("");
 
-  // --- CONFIGURATION SCREEN STATES (For human input) ---
+  // INVOICE IMAGE MODAL STATES
+  const [invoicePreviewVisible, setInvoicePreviewVisible] = useState(false);
+  const [currentInvoiceUrl, setCurrentInvoiceUrl] = useState(null);
+
+  // CONFIGURATION SCREEN STATES (For human input)
   const [configModalVisible, setConfigModalVisible] = useState(false);
-  const [activeConfigType, setActiveConfigType] = useState(null); // 'floor', 'cupboard', 'monthly', 'annual'
-  
+  const [activeConfigType, setActiveConfigType] = useState(null);
+
   // Input Selections
   const [selectedFloor, setSelectedFloor] = useState(null);
   const [selectedCupboard, setSelectedCupboard] = useState(null);
@@ -53,12 +63,48 @@ export default function ReportScreen() {
     loadInitData();
   }, []);
 
-  // --- DIRECT GENERATION (No input needed) ---
+  const uniqueCategories = useMemo(() => Array.from(new Set(inventory.map(i => i.category).filter(Boolean))).sort(), [inventory]);
+  const uniqueFloors = useMemo(() => Array.from(new Set(inventory.map(i => i.location).filter(Boolean))).sort(), [inventory]);
+  const cupboardsOnSelectedFloor = useMemo(() => {
+    if (!selectedFloor) return [];
+    const cupboards = inventory
+      .filter(i => i.location && i.location.includes(selectedFloor))
+      .map(i => i.cupboard.trim())
+      .filter(Boolean);
+    return Array.from(new Set(cupboards)).sort();
+  }, [inventory, selectedFloor]);
+
+  const availableCupboards = activeConfigType === 'cupboard' ? cupboardsOnSelectedFloor : [];
+  const sortedCupboards = useMemo(() => {
+    return availableCupboards.sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g, '')) || 0;
+      const numB = parseInt(b.replace(/\D/g, '')) || 0;
+      return numA - numB;
+    });
+  }, [availableCupboards]);
+
+  // CALCULATION LOGIC FOR SUMMARY CARDS
+  const totalQuantity = useMemo(() => {
+    return currentReportData.reduce((sum, item) => {
+      const qty = parseFloat(item.quantity || item.Quantity || item.qty || item.Qty || item.Total_Stock || item.openingStock || 0);
+      return sum + (isNaN(qty) ? 0 : qty);
+    }, 0);
+  }, [currentReportData]);
+
+  const totalAmount = useMemo(() => {
+    return currentReportData.reduce((sum, item) => {
+      // Looks for common amount/price keys
+      const amt = parseFloat(item.amount || item.Amount || item.total || item.Total || item.price || item.Price || 0);
+      return sum + (isNaN(amt) ? 0 : amt);
+    }, 0);
+  }, [currentReportData]);
+
+
   const generateDirectLocalReport = (type) => {
     let reportTitle = "";
     let data = [];
 
-    switch(type) {
+    switch (type) {
       case 'lowStock':
         reportTitle = "Low Stock Report";
         data = inventory.filter(item => item.openingStock <= item.minStock && item.ignoreLowStock !== 'Yes' && item.status !== 'Inactive');
@@ -88,48 +134,40 @@ export default function ReportScreen() {
     setReportModalVisible(true);
   };
 
-  // --- OPEN CONFIGURATION SCREEN ---
   const openConfigScreen = (type) => {
     setActiveConfigType(type);
-    
-    // Reset selections on open
     setSelectedFloor(null);
     setSelectedCupboard(null);
     setSelectedYear(new Date().getFullYear());
     setSelectedMonth(new Date().getMonth() + 1);
-    
     setConfigModalVisible(true);
   };
 
-  // --- EXECUTE REPORT FROM CONFIG SCREEN ---
   const handleGenerateConfiguredReport = async () => {
-    setConfigModalVisible(false); // Close config screen
+    setConfigModalVisible(false);
 
     if (activeConfigType === 'floor') {
       if (!selectedFloor) return Alert.alert("Missing Input", "Please select a floor.");
-      
       const data = inventory.filter(item => item.location && item.location.includes(selectedFloor));
       if (data.length === 0) return Alert.alert("No Data", `No items found on ${selectedFloor}.`);
-      
+
       setCurrentReportTitle(`${selectedFloor} Report`);
       setCurrentReportData(data);
       setReportModalVisible(true);
 
-    } 
+    }
     else if (activeConfigType === 'cupboard') {
       if (!selectedFloor || !selectedCupboard) return Alert.alert("Missing Input", "Please select both a floor and a cupboard.");
-      
-      // Assuming 'location' field stores data like "Floor 9 - Cupboard A"
-      const data = inventory.filter(item => item.location && item.location.includes(selectedFloor) && item.location.includes(selectedCupboard));
+      const data = inventory.filter(item => item.location && item.location.includes(selectedFloor) && item.cupboard.includes(selectedCupboard));
       if (data.length === 0) return Alert.alert("No Data", `No items found in ${selectedCupboard} on ${selectedFloor}.`);
-      
+
       setCurrentReportTitle(`${selectedFloor} - ${selectedCupboard} Report`);
       setCurrentReportData(data);
       setReportModalVisible(true);
     }
     else if (activeConfigType === 'monthly') {
       if (!selectedYear || !selectedMonth) return Alert.alert("Missing Input", "Select Year and Month.");
-      generateServerReport('getMonthlyStockInReport', { year: selectedYear, month: selectedMonth });
+      generateServerReport('report', { year: selectedYear, month: selectedMonth });
     }
     else if (activeConfigType === 'annual') {
       if (!selectedYear) return Alert.alert("Missing Input", "Select a Year.");
@@ -137,23 +175,20 @@ export default function ReportScreen() {
     }
   };
 
-  // --- SERVER REPORT EXECUTION ---
   const generateServerReport = async (action, params = {}) => {
     setIsLoading(true);
     try {
       const response = await postToGAS(action, params);
-      
-      // If fetching a preview to display:
-      if (action === 'getMonthlyStockInReport') {
+
+      if (action === 'report') {
         if (response.success && response.data && response.data.length > 0) {
-          setCurrentReportTitle(`Monthly Stock-In (${params.month}/${params.year})`);
+          setCurrentReportTitle(params.month === 'all' ? `Annual Report (${params.year})` : `Monthly Stock-In (${params.month}/${params.year})`);
           setCurrentReportData(response.data);
           setReportModalVisible(true);
         } else {
-           Alert.alert("No Data", "No stock-in records found for this period.");
+          Alert.alert("No Data", "No records found for this period.");
         }
-      } 
-      // If just triggering background generation:
+      }
       else {
         if (response.success) {
           Alert.alert("Report Generated", "The report has been compiled and saved to the Operations Google Drive folder.");
@@ -168,7 +203,6 @@ export default function ReportScreen() {
     }
   };
 
-  // --- EMAIL DELIVERY ---
   const handleEmailReport = async (format) => {
     if (!userEmail) {
       Alert.alert("Email Missing", "Could not find your email address in the session. Please re-login.");
@@ -176,15 +210,15 @@ export default function ReportScreen() {
     }
     setIsLoading(true);
     try {
-      const response = await postToGAS('emailReport', { 
-        format: format, 
+      const response = await postToGAS('emailReport', {
+        format: format,
         title: currentReportTitle,
         data: currentReportData,
         emailTo: userEmail
       });
       if (response.success) {
         Alert.alert("Success", `Your ${format.toUpperCase()} report was sent successfully.`);
-        setReportModalVisible(false); 
+        setReportModalVisible(false);
       } else {
         Alert.alert("Error", response.message || "Failed to send report.");
       }
@@ -195,11 +229,19 @@ export default function ReportScreen() {
     }
   };
 
-  // --- UI COMPONENTS ---
+  const openInvoicePreview = (url) => {
+    setReportModalVisible(false); // close first modal
+    setTimeout(() => {
+      setCurrentInvoiceUrl(url);
+      setInvoicePreviewVisible(true);
+    }, 300); // small delay for smooth transition
+  };
+
+  // UI COMPONENTS
   const ReportButton = ({ icon, label, sub, color = COLORS.primary, onPress, isLib = false }) => (
     <TouchableOpacity style={styles.reportCard} onPress={onPress} activeOpacity={0.7}>
       <View style={[styles.iconContainer, { backgroundColor: color + '15' }]}>
-        {isLib ? 
+        {isLib ?
           <MaterialCommunityIcons name={icon} size={28} color={color} /> :
           <Ionicons name={icon} size={28} color={color} />
         }
@@ -217,7 +259,14 @@ export default function ReportScreen() {
   const renderDataRow = ({ item, index }) => {
     const keys = Object.keys(item);
     const primaryTitle = item.itemName || item.Item_Name || item.Category_Name || `Record #${index + 1}`;
-    
+
+    // Check if there is an invoice URL key
+    const invoiceUrlKey = keys.find(k => {
+      const key = k.toLowerCase().replace(/\s|_/g, '');
+      return key.includes('invoice') || key.includes('bill');
+    });
+    const invoiceUrl = invoiceUrlKey ? item[invoiceUrlKey] : null;
+
     return (
       <View style={styles.dataRowCard}>
         <View style={styles.dataRowHeader}>
@@ -226,7 +275,7 @@ export default function ReportScreen() {
         </View>
         <View style={styles.dataRowContent}>
           {keys.map(key => {
-            if (key === 'Item_Name' || key === 'itemName' || key === 'Category_Name') return null; 
+            if (key === 'Item_Name' || key === 'itemName' || key === 'Category_Name' || key === invoiceUrlKey) return null;
             return (
               <View key={key} style={styles.dataCell}>
                 <Text style={styles.dataLabel}>{key.replace(/_/g, ' ')}</Text>
@@ -235,22 +284,70 @@ export default function ReportScreen() {
             )
           })}
         </View>
+
+        {/* INVOICE PREVIEW SECTION IN CARD */}
+        {invoiceUrl && (
+          <View style={styles.invoiceSection}>
+            <TouchableOpacity
+              style={styles.invoicePreviewBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                if (!invoiceUrl) {
+                  Alert.alert("No Invoice", "No invoice URL available");
+                  return;
+                }
+                openInvoicePreview(invoiceUrl);
+              }}
+            >
+              <Image source={{ uri: invoiceUrl }} style={styles.invoiceThumbnail} resizeMode="cover" />
+              <View style={styles.invoiceBtnOverlay}>
+                <Ionicons name="eye" size={16} color="#FFF" />
+                <Text style={styles.invoiceBtnText}>Preview Invoice</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
 
-  // HELPER: Renders mock dropdowns as horizontal pills
+  const renderSummaryCards = () => (
+    <View style={styles.summaryContainer}>
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryIconBox}>
+          <Ionicons name="cube-outline" size={20} color={COLORS.primary} />
+        </View>
+        <Text style={styles.summaryLabel}>Total Items</Text>
+        <Text style={styles.summaryValue}>{currentReportData.length}</Text>
+      </View>
+      <View style={styles.summaryCard}>
+        <View style={[styles.summaryIconBox, { backgroundColor: '#10B98115' }]}>
+          <Ionicons name="layers-outline" size={20} color="#10B981" />
+        </View>
+        <Text style={styles.summaryLabel}>Total Qty</Text>
+        <Text style={styles.summaryValue}>{totalQuantity}</Text>
+      </View>
+      <View style={styles.summaryCard}>
+        <View style={[styles.summaryIconBox, { backgroundColor: '#F59E0B15' }]}>
+          <Ionicons name="cash-outline" size={20} color="#F59E0B" />
+        </View>
+        <Text style={styles.summaryLabel}>Total Spent</Text>
+        <Text style={styles.summaryValue} numberOfLines={1} adjustsFontSizeToFit>₹{totalAmount.toLocaleString()}</Text>
+      </View>
+    </View>
+  );
+
   const renderPillSelector = (options, selectedValue, onSelect, isObject = false) => (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillContainer}>
       {options.map((opt, idx) => {
         const label = isObject ? opt.label : opt;
         const value = isObject ? opt.val : opt;
         const isSelected = selectedValue === value;
-        
+
         return (
-          <TouchableOpacity 
-            key={idx} 
-            style={[styles.pill, isSelected && styles.pillSelected]} 
+          <TouchableOpacity
+            key={idx}
+            style={[styles.pill, isSelected && styles.pillSelected]}
             onPress={() => onSelect(value)}
           >
             <Text style={[styles.pillText, isSelected && styles.pillTextSelected]}>{label}</Text>
@@ -262,47 +359,43 @@ export default function ReportScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* MAIN SCREEN HEADER */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Inventory Reports</Text>
         <Text style={styles.headerSub}>Export data to PDF or Excel formats</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
-        {/* --- STOCK ANALYSIS --- */}
+
         <Text style={styles.sectionHeader}>Stock Analysis</Text>
-        <ReportButton 
+        <ReportButton
           icon="alert-circle-outline" label="Low Stock Items" sub="Items currently below minimum threshold" color="#EF4444"
           onPress={() => generateDirectLocalReport('lowStock')}
         />
-        <ReportButton 
-          icon="briefcase-outline" label="All Items Report" sub="Complete snapshot of current inventory" 
+        <ReportButton
+          icon="briefcase-outline" label="All Items Report" sub="Complete snapshot of current inventory"
           onPress={() => generateDirectLocalReport('all')}
         />
-        <ReportButton 
+        <ReportButton
           icon="shape-outline" isLib={true} label="Category Report" sub="Stock levels grouped by item category" color="#8B5CF6"
           onPress={() => generateDirectLocalReport('category')}
         />
 
-        {/* --- LOCATION REPORTS (Require Input) --- */}
         <Text style={styles.sectionHeader}>Location Reports</Text>
-        <ReportButton 
+        <ReportButton
           icon="layers-outline" label="Floor Wise Report" sub="Inventory filtered by floor location" color="#3B82F6"
           onPress={() => openConfigScreen('floor')}
         />
-        <ReportButton 
+        <ReportButton
           icon="grid-outline" label="Cupboard Report" sub="Breakdown of items in specific cupboards" color="#10B981"
           onPress={() => openConfigScreen('cupboard')}
         />
 
-        {/* --- HISTORICAL SERVER SIDE (Require Input) --- */}
         <Text style={styles.sectionHeader}>Historical (Server Side)</Text>
-        <ReportButton 
+        <ReportButton
           icon="calendar-month-outline" isLib={true} label="Monthly Stock-In" sub="Report of all receipts for specific month" color="#F59E0B"
           onPress={() => openConfigScreen('monthly')}
         />
-        <ReportButton 
+        <ReportButton
           icon="calendar-check-outline" isLib={true} label="Annual Audit Report" sub="Yearly transaction and loss summary" color="#64748B"
           onPress={() => openConfigScreen('annual')}
         />
@@ -311,9 +404,7 @@ export default function ReportScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* ========================================== */}
-      {/* --- CONFIGURATION SCREEN MODAL (NEW) --- */}
-      {/* ========================================== */}
+      {/* CONFIGURATION MODAL */}
       <Modal visible={configModalVisible} animationType="slide" transparent={true}>
         <View style={styles.configModalOverlay}>
           <View style={styles.configModalContainer}>
@@ -325,24 +416,20 @@ export default function ReportScreen() {
             </View>
 
             <View style={styles.configBody}>
-              
-              {/* Floor Dropdown (Needed for 'floor' and 'cupboard') */}
               {(activeConfigType === 'floor' || activeConfigType === 'cupboard') && (
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Select Floor</Text>
-                  {renderPillSelector(FLOORS, selectedFloor, setSelectedFloor)}
+                  {renderPillSelector(uniqueFloors, selectedFloor, setSelectedFloor)}
                 </View>
               )}
 
-              {/* Cupboard Dropdown (Needed for 'cupboard' only) */}
               {activeConfigType === 'cupboard' && (
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Select Cupboard</Text>
-                  {renderPillSelector(CUPBOARDS, selectedCupboard, setSelectedCupboard)}
+                  {renderPillSelector(sortedCupboards, selectedCupboard, setSelectedCupboard)}
                 </View>
               )}
 
-              {/* Year Dropdown (Needed for 'monthly' and 'annual') */}
               {(activeConfigType === 'monthly' || activeConfigType === 'annual') && (
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Select Year</Text>
@@ -350,14 +437,12 @@ export default function ReportScreen() {
                 </View>
               )}
 
-              {/* Month Dropdown (Needed for 'monthly' only) */}
               {activeConfigType === 'monthly' && (
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Select Month</Text>
                   {renderPillSelector(MONTHS, selectedMonth, setSelectedMonth, true)}
                 </View>
               )}
-
             </View>
 
             <View style={styles.configFooter}>
@@ -370,15 +455,12 @@ export default function ReportScreen() {
         </View>
       </Modal>
 
-      {/* ========================================== */}
-      {/* --- PREVIEW AND EXPORT MODAL --- */}
-      {/* ========================================== */}
+      {/* PREVIEW AND EXPORT MODAL */}
       <Modal visible={reportModalVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.modalTitle}>{currentReportTitle}</Text>
-              <Text style={styles.recordCount}>{currentReportData.length} Records Generated</Text>
             </View>
             <TouchableOpacity style={styles.closeButton} onPress={() => setReportModalVisible(false)}>
               <Ionicons name="close" size={24} color={COLORS.textMuted} />
@@ -388,6 +470,7 @@ export default function ReportScreen() {
           <FlatList
             data={currentReportData}
             keyExtractor={(item, index) => index.toString()}
+            ListHeaderComponent={renderSummaryCards}
             renderItem={renderDataRow}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
@@ -405,12 +488,35 @@ export default function ReportScreen() {
 
                 <TouchableOpacity style={[styles.exportBtn, { backgroundColor: COLORS.success }]} onPress={() => handleEmailReport('excel')}>
                   <MaterialCommunityIcons name="file-excel-box" size={22} color="#FFF" />
-                  <Text style={styles.exportBtnText}>Send as Excel</Text>
+                  <Text style={styles.exportBtnText}>Send Excel</Text>
                 </TouchableOpacity>
               </View>
             )}
             <Text style={styles.exportFooterText}>Report will be emailed to {userEmail}</Text>
           </View>
+        </View>
+      </Modal>
+
+      {/* FULL-SCREEN INVOICE IMAGE MODAL */}
+      <Modal visible={invoicePreviewVisible} transparent={true} animationType="fade">
+        <View style={styles.imageModalOverlay}>
+          <TouchableOpacity
+            style={styles.imageModalCloseBtn}
+            onPress={() => {
+              setInvoicePreviewVisible(false);
+              setTimeout(() => setReportModalVisible(true), 300);
+            }}
+          >
+            <Ionicons name="close-circle" size={36} color="#FFF" />
+          </TouchableOpacity>
+
+          {currentInvoiceUrl && (
+            <Image
+              source={{ uri: currentInvoiceUrl }}
+              style={styles.fullScreenImage}
+              resizeMode="contain"
+            />
+          )}
         </View>
       </Modal>
 
@@ -424,10 +530,9 @@ const styles = StyleSheet.create({
   headerTitle: { color: COLORS.text, fontSize: 26, fontWeight: 'bold' },
   headerSub: { color: COLORS.textMuted, fontSize: 14, marginTop: 4 },
   scrollContent: { padding: 16 },
-  
+
   sectionHeader: { color: COLORS.primary, fontSize: 13, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, marginTop: 20, marginLeft: 4 },
-  
-  // Old Report Button Styles
+
   reportCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card, padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
   iconContainer: { width: 52, height: 52, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
   reportTextContainer: { flex: 1 },
@@ -435,17 +540,15 @@ const styles = StyleSheet.create({
   reportSub: { color: COLORS.textMuted, fontSize: 12, lineHeight: 18, paddingRight: 10 },
   actionChevron: { backgroundColor: COLORS.inputBg, padding: 6, borderRadius: 10 },
 
-  // Configuration Modal Styles (The "New Screen" for inputs)
-  configModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  configModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   configModalContainer: { backgroundColor: COLORS.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, minHeight: '50%' },
   configHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   configTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.text },
-  configBody: { padding: 20 },
+  configBody: { padding: 20, flex: 1 },
   inputGroup: { marginBottom: 24 },
   inputLabel: { color: COLORS.text, fontSize: 14, fontWeight: '700', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
-  
-  // Mock Dropdown Pills
-  pillContainer: { gap: 10, paddingRight: 20 },
+
+  pillContainer: { gap: 2, paddingRight: 20 },
   pill: { backgroundColor: COLORS.inputBg, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginRight: 10 },
   pillSelected: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   pillText: { color: COLORS.text, fontSize: 16, fontWeight: '500' },
@@ -455,14 +558,19 @@ const styles = StyleSheet.create({
   generateActionBtn: { backgroundColor: COLORS.primary, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 16, borderRadius: 14, gap: 8 },
   generateActionText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
 
-  // Preview Modal Styles
   modalContainer: { flex: 1, backgroundColor: COLORS.background },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, paddingTop: 25, backgroundColor: COLORS.card, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   modalTitle: { fontSize: 20, fontWeight: '800', color: COLORS.text },
-  recordCount: { fontSize: 14, color: COLORS.textMuted, fontWeight: '600', marginTop: 4 },
   closeButton: { backgroundColor: COLORS.inputBg, padding: 8, borderRadius: 20 },
   listContent: { padding: 16, paddingBottom: 40 },
-  
+
+  // Summary Cards
+  summaryContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, gap: 10 },
+  summaryCard: { flex: 1, backgroundColor: COLORS.card, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
+  summaryIconBox: { backgroundColor: COLORS.primary + '15', padding: 8, borderRadius: 10, marginBottom: 8 },
+  summaryLabel: { fontSize: 11, fontWeight: '600', color: COLORS.textMuted, textTransform: 'uppercase', marginBottom: 4 },
+  summaryValue: { fontSize: 18, fontWeight: 'bold', color: COLORS.text, textAlign: 'center' },
+
   dataRowCard: { backgroundColor: COLORS.card, borderRadius: 16, marginBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border },
   dataRowHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, padding: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   dataRowIndex: { fontSize: 14, fontWeight: 'bold', color: COLORS.primary, width: 35 },
@@ -471,6 +579,18 @@ const styles = StyleSheet.create({
   dataCell: { width: '50%', paddingVertical: 6, paddingRight: 8 },
   dataLabel: { fontSize: 11, fontWeight: '700', color: COLORS.textMuted, textTransform: 'uppercase', marginBottom: 2 },
   dataValue: { fontSize: 14, color: COLORS.text, fontWeight: '500' },
+
+  // Invoice Styles inside data row
+  invoiceSection: { padding: 12, paddingTop: 0 },
+  invoicePreviewBtn: { height: 100, borderRadius: 12, overflow: 'hidden', position: 'relative', backgroundColor: COLORS.inputBg },
+  invoiceThumbnail: { width: '100%', height: '100%', opacity: 0.7 },
+  invoiceBtnOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6 },
+  invoiceBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
+
+  // Full Screen Image Modal Styles
+  imageModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
+  imageModalCloseBtn: { position: 'absolute', top: 50, right: 20, zIndex: 200 },
+  fullScreenImage: { width: '100%', height: '80%' },
 
   exportPanel: { padding: 20, paddingBottom: 40, backgroundColor: COLORS.card, borderTopWidth: 1, borderTopColor: COLORS.border },
   actionRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
