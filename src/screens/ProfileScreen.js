@@ -6,34 +6,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { COLORS } from '../constants/theme';
 import { StorageService } from '../services/storage';
-
-// Updated CAPS Applications Data
-const CAPS_APPS = [
-  { 
-    id: '1', 
-    name: 'CAPS Attendance', 
-    desc: 'Attendance tracking', 
-    image: require('../../assets/images/caps_ams.png'),
-    color: '#3B82F6',
-    isDraft: true
-  },
-  { 
-    id: '2', 
-    name: 'CAPS Content', 
-    desc: 'Content creation & management', 
-    image: require('../../assets/images/caps_content.png'), 
-    color: '#10B981',
-    isDraft: true
-  },
-  { 
-    id: '3', 
-    name: 'CAPS Service', 
-    desc: 'Service request & management', 
-    image: require('../../assets/images/caps_service.png'), 
-    color: '#F59E0B',
-    isDraft: true
-  },
-];
+import { useNavigation } from 'expo-router';
+import { CAPS_APPS } from '../constants/apps';
 
 export default function ProfileScreen({ userData, setToken }) {
   const [contactModalVisible, setContactModalVisible] = useState(false);
@@ -42,6 +16,14 @@ export default function ProfileScreen({ userData, setToken }) {
   const [appsModalVisible, setAppsModalVisible] = useState(false);
 
   const [mailEnabled, setMailEnabled] = useState(true);
+
+  const navigate = useNavigation();
+
+  // sort caps apps, show non-draft apps first
+  const sortedCapsApps = [...CAPS_APPS].sort((a, b) => {
+    if (a.isDraft === b.isDraft) return 0;
+    return a.isDraft ? 1 : -1;
+  });
 
   const handleLogout = async () => {
     Alert.alert("Log Out", "Are you sure you want to log out?", [
@@ -233,7 +215,7 @@ export default function ProfileScreen({ userData, setToken }) {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.appListContainer}>
-              {CAPS_APPS.map((app) => (
+              {sortedCapsApps.map((app) => (
                 <TouchableOpacity 
                   key={app.id} 
                   style={[styles.appCard, app.isDraft && styles.appCardDraft]}
@@ -261,6 +243,12 @@ export default function ProfileScreen({ userData, setToken }) {
                   <TouchableOpacity 
                     style={[styles.openBtn, app.isDraft && { backgroundColor: COLORS.border || '#E5E7EB' }]} 
                     disabled={app.isDraft}
+                    onPress={() => {
+                      if (!app.isDraft) {
+                        setAppsModalVisible(false);
+                        navigate.navigate(app.redirectTo);
+                      }
+                    }}
                   >
                     <Text style={[
                       styles.openBtnText, 

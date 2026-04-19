@@ -72,7 +72,7 @@ function BottomTabs({ userData, setToken }) {
       </Tab.Screen>
 
       {/* Report Tab */}
-      {isAdmin && <Tab.Screen
+      {/* {isAdmin && <Tab.Screen
         name="Reports"
         component={ReportScreen}
         options={{
@@ -80,7 +80,7 @@ function BottomTabs({ userData, setToken }) {
             <Ionicons name="document-text-outline" size={size} color={color} />
           ),
         }}
-      />}
+      />} */}
     </Tab.Navigator>
   );
 }
@@ -145,6 +145,7 @@ export default function AppNavigator() {
             <Stack.Screen name="Cupboard" component={CupboardScreen} />
             <Stack.Screen name="Relocate" component={RelocateScreen} />
             <Stack.Screen name="Issue" component={IssueScreen} />
+            <Stack.Screen name="Reports" component={ReportScreen} />
           </>
         )}
       </Stack.Navigator>
