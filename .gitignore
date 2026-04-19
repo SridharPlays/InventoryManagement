@@ -42,7 +42,7 @@ app-example
 /ios
 /android
 
-google-services.json
+# google-services.json
 *.apk
 node_modules
 credentials.json

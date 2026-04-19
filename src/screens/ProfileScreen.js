@@ -1,69 +1,84 @@
 import React, { useState } from 'react';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Switch } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Switch, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { COLORS } from '../constants/theme';
 import { StorageService } from '../services/storage';
 
-// Notice we added setToken here!
+// Updated CAPS Applications Data
+const CAPS_APPS = [
+  { 
+    id: '1', 
+    name: 'CAPS Attendance', 
+    desc: 'Attendance tracking', 
+    image: require('../../assets/images/caps_ams.png'),
+    color: '#3B82F6',
+    isDraft: true
+  },
+  { 
+    id: '2', 
+    name: 'CAPS Content', 
+    desc: 'Content creation & management', 
+    image: require('../../assets/images/caps_content.png'), 
+    color: '#10B981',
+    isDraft: true
+  },
+  { 
+    id: '3', 
+    name: 'CAPS Service', 
+    desc: 'Service request & management', 
+    image: require('../../assets/images/caps_service.png'), 
+    color: '#F59E0B',
+    isDraft: true
+  },
+];
+
 export default function ProfileScreen({ userData, setToken }) {
-  // State for Modals
   const [contactModalVisible, setContactModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
   const [preferencesModalVisible, setPreferencesModalVisible] = useState(false);
+  const [appsModalVisible, setAppsModalVisible] = useState(false);
 
-  // State for Toggle Preference
   const [mailEnabled, setMailEnabled] = useState(true);
 
   const handleLogout = async () => {
-    Alert.alert(
-      "Log Out",
-      "Are you sure you want to log out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Log Out",
-          style: "destructive",
-          onPress: async () => {
-            await AsyncStorage.removeItem('userToken');
-            await AsyncStorage.removeItem('userData');
-            setToken(null); // This instantly kicks the user back to the SignIn screen!
-          }
+    Alert.alert("Log Out", "Are you sure you want to log out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Log Out",
+        style: "destructive",
+        onPress: async () => {
+          await AsyncStorage.removeItem('userToken');
+          await AsyncStorage.removeItem('userData');
+          setToken(null); 
         }
-      ]
-    );
+      }
+    ]);
   };
 
   const handleClearCache = async () => {
-    Alert.alert(
-      "Clear Cache",
-      "Are you sure you want to clear the locally stored inventory data?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Clear",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await StorageService.removeCachedData('getInventory');
-              Alert.alert("Success", "Inventory cache has been cleared.");
-            } catch (error) {
-              console.error("Failed to clear cache:", error);
-              Alert.alert("Error", "Could not clear the cached data.");
-            }
+    Alert.alert("Clear Cache", "Are you sure you want to clear the locally stored inventory data?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Clear",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await StorageService.removeCachedData('getInventory');
+            Alert.alert("Success", "Inventory cache has been cleared.");
+          } catch (error) {
+            console.error("Failed to clear cache:", error);
+            Alert.alert("Error", "Could not clear the cached data.");
           }
         }
-      ]
-    );
+      }
+    ]);
   };
 
   const handleSavePreferences = () => {
-    Alert.alert(
-      "Preferences Saved",
-      `Mail Notifications are now ${mailEnabled ? 'ON' : 'OFF'}`
-    );
+    Alert.alert("Preferences Saved", `Mail Notifications are now ${mailEnabled ? 'ON' : 'OFF'}`);
     setPreferencesModalVisible(false);
   };
 
@@ -84,15 +99,12 @@ export default function ProfileScreen({ userData, setToken }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContentProfile} scrollEnabled={false}>
+      <ScrollView contentContainerStyle={styles.scrollContentProfile}>
         <View style={styles.headerProfile}>
           <Text style={styles.headerTitle}>Profile</Text>
         </View>
 
-        <TouchableOpacity 
-          style={styles.userCard} 
-          onPress={() => setPreferencesModalVisible(true)}
-        >
+        <TouchableOpacity style={styles.userCard} onPress={() => setPreferencesModalVisible(true)}>
           <View style={styles.avatarPlaceholder}>
             <Text style={{ color: COLORS.text, fontSize: 20, fontWeight: 'bold' }}>
               {userData?.name ? userData.name.charAt(0).toUpperCase() : <Ionicons name="person" size={24} color={COLORS.textMuted} />}
@@ -114,17 +126,11 @@ export default function ProfileScreen({ userData, setToken }) {
 
         <Text style={styles.sectionTitle}>App</Text>
         <View style={styles.cardGroup}>
-          <ProfileItem
-            icon="card-account-mail-outline"
-            label="Contact us"
-            onPress={() => setContactModalVisible(true)}
-          />
+          <ProfileItem icon="card-account-mail-outline" label="Contact us" onPress={() => setContactModalVisible(true)} />
           <View style={styles.itemDivider} />
-          <ProfileItem
-            icon="help-circle-outline"
-            label="Help & Support"
-            onPress={() => setHelpModalVisible(true)}
-          />
+          <ProfileItem icon="help-circle-outline" label="Help & Support" onPress={() => setHelpModalVisible(true)} />
+          <View style={styles.itemDivider} />
+          <ProfileItem icon="application-outline" label="More Applications" onPress={() => setAppsModalVisible(true)} />
         </View>
 
         <View style={[styles.cardGroup, { marginTop: 20 }]}>
@@ -149,7 +155,7 @@ export default function ProfileScreen({ userData, setToken }) {
       </ScrollView>
 
       {/* Preferences Modal */}
-      <Modal animationType="slide" transparent={true} visible={preferencesModalVisible} onRequestClose={() => setPreferencesModalVisible(false)}>
+      <Modal animationType="fade" transparent={true} visible={preferencesModalVisible} onRequestClose={() => setPreferencesModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>User Preferences</Text>
@@ -176,7 +182,7 @@ export default function ProfileScreen({ userData, setToken }) {
       </Modal>
 
       {/* Contact Us Modal */}
-      <Modal animationType="slide" transparent={true} visible={contactModalVisible} onRequestClose={() => setContactModalVisible(false)}>
+      <Modal animationType="fade" transparent={true} visible={contactModalVisible} onRequestClose={() => setContactModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Contact Us</Text>
@@ -189,7 +195,7 @@ export default function ProfileScreen({ userData, setToken }) {
       </Modal>
 
       {/* Help & Support Modal */}
-      <Modal animationType="slide" transparent={true} visible={helpModalVisible} onRequestClose={() => setHelpModalVisible(false)}>
+      <Modal animationType="fade" transparent={true} visible={helpModalVisible} onRequestClose={() => setHelpModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Help & Support</Text>
@@ -201,6 +207,72 @@ export default function ProfileScreen({ userData, setToken }) {
         </View>
       </Modal>
 
+      {/* Bottom Sheet Modal for More Applications */}
+      <Modal 
+        animationType="slide" 
+        transparent={true} 
+        visible={appsModalVisible} 
+        onRequestClose={() => setAppsModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.bottomSheetOverlay} 
+          activeOpacity={1} 
+          onPress={() => setAppsModalVisible(false)}
+        >
+          <View style={styles.bottomSheetContainer}>
+            <View style={styles.bottomSheetHeader}>
+              <View style={styles.dragHandle} />
+              <View style={styles.bottomSheetHeaderTitleRow}>
+                <Text style={styles.bottomSheetTitle}>More CAPS Apps</Text>
+                <TouchableOpacity onPress={() => setAppsModalVisible(false)}>
+                  <Ionicons name="close" size={24} color={COLORS.textMuted} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.appListContainer}>
+              {CAPS_APPS.map((app) => (
+                <TouchableOpacity 
+                  key={app.id} 
+                  style={[styles.appCard, app.isDraft && styles.appCardDraft]}
+                  activeOpacity={app.isDraft ? 1 : 0.7}
+                >
+                  <View style={styles.appLogoContainer}>
+                    <Image 
+                      source={app.image}
+                      style={styles.appImage} 
+                      resizeMode="cover"
+                    />
+                  </View>
+                  <View style={styles.appCardInfo}>
+                    <Text style={styles.appCardName}>{app.name}</Text>
+                    <Text style={styles.appCardDesc}>{app.desc}</Text>
+                    
+                    {app.isDraft && (
+                      <View style={[styles.draftBadge, { borderColor: COLORS.border || '#E5E7EB' }]}>
+                        <Ionicons name="time-outline" size={12} color={COLORS.textMuted || '#6B7280'} style={{marginRight: 4}} />
+                        <Text style={[styles.draftBadgeText, { color: COLORS.textMuted || '#6B7280' }]}>Under Development</Text>
+                      </View>
+                    )}
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={[styles.openBtn, app.isDraft && { backgroundColor: COLORS.border || '#E5E7EB' }]} 
+                    disabled={app.isDraft}
+                  >
+                    <Text style={[
+                      styles.openBtnText, 
+                      app.isDraft && { color: COLORS.textMuted || '#9CA3AF' }
+                    ]}>
+                      {app.isDraft ? 'Soon' : 'Open'}
+                    </Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -238,4 +310,22 @@ const styles = StyleSheet.create({
   modalButtonCancel: { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.border || '#E5E7EB' },
   modalButtonPrimary: { backgroundColor: COLORS.primary || '#007BFF' },
   modalButtonCancelText: { color: COLORS.textMuted || '#6B7280', fontSize: 16, fontWeight: '600' },
+  bottomSheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  bottomSheetContainer: { backgroundColor: COLORS.background || '#F9FAFB', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '70%', paddingBottom: 20 },
+  bottomSheetHeader: { padding: 20, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border || '#E5E7EB' },
+  dragHandle: { width: 40, height: 4, backgroundColor: COLORS.border || '#D1D5DB', borderRadius: 2, alignSelf: 'center', marginBottom: 15 },
+  bottomSheetHeaderTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  bottomSheetTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text },
+  appListContainer: { padding: 20 },
+  appCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card || '#FFF', padding: 15, borderRadius: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
+  appCardDraft: { opacity: 0.65 }, 
+  appLogoContainer: { width: 60, height: 60, borderRadius: 12, overflow: 'hidden', marginRight: 15, backgroundColor: COLORS.border || '#E5E7EB' }, 
+  appImage: { width: '100%', height: '100%' },
+  appCardInfo: { flex: 1 },
+  appCardName: { fontSize: 16, fontWeight: '600', color: COLORS.text, marginBottom: 2 },
+  appCardDesc: { fontSize: 12, color: COLORS.textMuted, marginBottom: 6 },
+  draftBadge: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
+  draftBadgeText: { fontSize: 10, fontWeight: '600' },
+  openBtn: { backgroundColor: `${COLORS.primary || '#007BFF'}15`, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20 },
+  openBtnText: { color: COLORS.primary || '#007BFF', fontSize: 13, fontWeight: '600' },
 });
