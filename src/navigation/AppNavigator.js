@@ -21,6 +21,7 @@ import RequestItemScreen from '../screens/RequestItemScreen';
 import ScannerScreen from '../screens/ScannerScreen';
 import SignInScreen from '../screens/SignInScreen';
 import StockInScreen from '../screens/StockInScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -122,16 +123,27 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {userToken == null ? (
-          // NO TOKEN: Show Login Screen
-          <Stack.Screen name="SignIn">
-            {(props) => (
-              <SignInScreen
-                {...props}
-                setToken={setUserToken}
-                setUserData={setUserData}
-              />
-            )}
-          </Stack.Screen>
+          // NO TOKEN: Show Login Screen Stack
+          <>
+            <Stack.Screen name="SignIn">
+              {(props) => (
+                <SignInScreen
+                  {...props}
+                  setToken={setUserToken}
+                  setUserData={setUserData}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen name="ForgotPassword">
+              {(props) => (
+                <ForgotPasswordScreen
+                  {...props}
+                  setToken={setUserToken}
+                  setUserData={setUserData}
+                />
+              )}
+            </Stack.Screen>
+          </>
         ) : (
           // HAS TOKEN: Show App
           <>

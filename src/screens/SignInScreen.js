@@ -39,7 +39,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export default function SignInScreen({ setToken, setUserData }) {
+export default function SignInScreen({ navigation, setToken, setUserData }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setPasswordVisible] = useState(false);
@@ -223,7 +223,7 @@ export default function SignInScreen({ setToken, setUserData }) {
         </TouchableOpacity>
 
         <View style={styles.rowBetween}>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
             <Text style={[styles.textSmall, { color: COLORS.primary }]}>Forgot password?</Text>
           </TouchableOpacity>
         </View>
