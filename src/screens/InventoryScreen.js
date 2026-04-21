@@ -250,7 +250,7 @@ export default function InventoryScreen({ navigation }) {
           <Image source={item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/caps_logo.png')} style={styles.gridImageFull} resizeMode="cover" />
           <View style={styles.gridOverlay}>
             <Text style={styles.gridItemName} numberOfLines={1}>{item.itemName}</Text>
-            <Text style={styles.gridItemSub} numberOfLines={1}>{item.category} • {item.location}</Text>
+            <Text style={styles.gridItemSub} numberOfLines={1}>{item.category} • {item.location} {item.cupboard ? `(C: ${item.cupboard})` : ''} {item.rack ? `(R: ${item.rack})` : ''}</Text>
             <Text style={styles.gridItemCount}>{item.openingStock} {item.unit || ''}</Text>
           </View>
         </TouchableOpacity>
@@ -262,14 +262,14 @@ export default function InventoryScreen({ navigation }) {
         style={styles.listCard} 
         activeOpacity={0.7} 
         onPress={() => setSelectedItem(item)}
-        onLongPress={() => handleLongPress(item)} // NATIVE ALERT
+        onLongPress={() => handleLongPress(item)}
       >
         <View style={styles.iconPlaceholder}>
           <Image source={item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/caps_logo.png')} style={{ width: '100%', height: '100%', borderRadius: 8 }} resizeMode="cover" />
         </View>
         <View style={styles.listContent}>
           <Text style={styles.itemName} numberOfLines={1}>{item.itemName}</Text>
-          <Text style={styles.itemSub}>{item.category} • {item.location} {item.cupboard ? `(C: ${item.cupboard})` : ''}</Text>
+          <Text style={styles.itemSub}>{item.category} • {item.location} {item.cupboard ? `(C: ${item.cupboard})` : ''} {item.rack ? `(R: ${item.rack})` : ''}</Text>
         </View>
         <View style={styles.listTrailing}>
           <Text style={styles.stockText}>{item.openingStock} {item.unit || ''}</Text>
@@ -363,13 +363,12 @@ export default function InventoryScreen({ navigation }) {
                     <View style={styles.detailRow}><Text style={styles.detailLabel}>Item ID:</Text><Text style={styles.detailValue}>{selectedItem.itemId}</Text></View>
                     <View style={styles.detailRow}><Text style={styles.detailLabel}>Category:</Text><Text style={styles.detailValue}>{selectedItem.category || 'N/A'}</Text></View>
                     <View style={styles.detailRow}><Text style={styles.detailLabel}>Location:</Text><Text style={styles.detailValue}>{selectedItem.location || 'N/A'}</Text></View>
-                    <View style={styles.detailRow}><Text style={styles.detailLabel}>Cupboard:</Text><Text style={styles.detailValue}>{selectedItem.cupboard || 'N/A'}</Text></View>
+                    <View style={styles.detailRow}><Text style={styles.detailLabel}>Cupboard:</Text><Text style={styles.detailValue}>{selectedItem.cupboard || 'N/A'} - {selectedItem.rack || 'N/A'}</Text></View>
                     <View style={styles.detailRow}><Text style={styles.detailLabel}>Current Stock:</Text>
                       <Text style={[styles.detailValue, {fontWeight: 'bold', color: COLORS.primary}]}>{selectedItem.openingStock} {selectedItem.unit || ''}</Text>
                     </View>
                   </View>
 
-                  {/* VISIBLE VERTICAL STACKED BUTTONS */}
                   <View style={styles.verticalActionContainer}>
                     <TouchableOpacity 
                       style={[styles.fullWidthButton, { backgroundColor: '#3B82F6' }]} 
@@ -469,6 +468,15 @@ export default function InventoryScreen({ navigation }) {
 
                     <CustomDropdown label="Floor Location" options={uniqueFloors} selectedValue={editForm.location} onSelect={(val) => setEditForm({...editForm, location: val, cupboard: ''})} />
                     <CustomDropdown label="Cupboard" options={editAvailableCupboards} selectedValue={editForm.cupboard} onSelect={(val) => setEditForm({...editForm, cupboard: val})} />
+                    
+                    <Text style={styles.inputLabel}>Rack</Text>
+                    <TextInput 
+                        style={[styles.input, { width: '30%', marginBottom: 24 }]} 
+                        placeholder="e.g. 2A, 3B" 
+                        placeholderTextColor={COLORS.textMuted}
+                        value={editForm.rack} 
+                        onChangeText={(t) => setEditForm({...editForm, rack: t})} 
+                      />
 
                     <View style={styles.modalActionsRow}>
                       <TouchableOpacity style={styles.clearButton} onPress={() => setIsEditing(false)} disabled={isSaving}>
@@ -504,7 +512,7 @@ const styles = StyleSheet.create({
   activeFilterDot: { position: 'absolute', top: 12, right: 12, width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.text },
   emptyText: { color: COLORS.textMuted, textAlign: 'center', marginTop: 40, width: '100%' },
 
-  listContainer: { paddingHorizontal: 16, paddingBottom: 40, gap: 12 },
+  listContainer: { paddingHorizontal: 16, paddingBottom: 40, gap: 2 },
   gridRow: { justifyContent: 'space-between', gap: 12 },
   listCard: { flexDirection: 'row', backgroundColor: COLORS.card, padding: 8, borderRadius: 12, alignItems: 'center', marginBottom: 12 },
   iconPlaceholder: { width: 70, height: 70, borderRadius: 8, backgroundColor: COLORS.primary + '20' },

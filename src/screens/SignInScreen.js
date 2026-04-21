@@ -156,7 +156,6 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
       await StorageService.saveSession(response.user);
 
       registerForPushNotificationsAsync(response.user.email);
-
     } else {
       Alert.alert("Login Failed", response.message || "Invalid credentials");
     }

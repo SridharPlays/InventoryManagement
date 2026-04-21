@@ -2,18 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    Modal,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
-import { fetchFromGAS, postToGAS } from '../services/api'; // <-- Added postToGAS
+import { fetchFromGAS, postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 
 export default function DashboardScreen() {
@@ -65,7 +65,7 @@ export default function DashboardScreen() {
     loadData(false);
   }, [loadData]);
 
-  // NEW: IGNORE LOW STOCK LOGIC
+  // LOW STOCK LOGIC
   const handleLongPressLowStock = (item) => {
     Alert.alert(
       "Ignore Low Stock?",
@@ -84,7 +84,6 @@ export default function DashboardScreen() {
   const ignoreLowStockAlert = async (lowStockItem) => {
     try {
       setRefreshing(true);
-      // 1. Fetch full inventory from local cache to get all required fields
       const inventory = await StorageService.getCachedData('getInventory') || [];
       const fullItem = inventory.find(invItem => invItem.itemId === lowStockItem.id);
 
@@ -94,22 +93,60 @@ export default function DashboardScreen() {
         return;
       }
 
-      // 2. Set the ignore flag to Yes
       const updatedItem = { ...fullItem, ignoreLowStock: 'Yes' };
-
-      // 3. Send the update to Google Apps Script
       const response = await postToGAS('updateItem', { itemData: updatedItem });
 
       if (response.success) {
         Alert.alert("Success", `${lowStockItem.name} will no longer trigger alerts.`);
-        await StorageService.removeCachedData('getInventory'); // Clear cache so it updates
-        loadData(true); // Force refresh dashboard to clear the item from the list
+        await StorageService.removeCachedData('getInventory');
+        loadData(true);
       } else {
         Alert.alert("Error", response.message || "Failed to update item.");
         setRefreshing(false);
       }
     } catch (error) {
       console.error("Error ignoring low stock:", error);
+      Alert.alert("Error", "An unexpected network error occurred.");
+      setRefreshing(false);
+    }
+  };
+
+  // NEW: MARK AS RETURNED LOGIC
+  const handleMarkReturned = (item) => {
+    Alert.alert(
+      "Confirm Return",
+      `Are you sure you want to mark ${item.item} as returned?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Yes, Mark Returned",
+          style: "default",
+          onPress: () => processMarkReturned(item)
+        }
+      ]
+    );
+  };
+
+  const processMarkReturned = async (item) => {
+    if (!item.id) {
+      Alert.alert("Error", "Missing item ID. Ensure backend sends 'id' in getDashboard.");
+      return;
+    }
+
+    try {
+      setRefreshing(true);
+      const response = await postToGAS('markReturned', { rowNumber: item.id });
+
+      if (response.success) {
+        Alert.alert("Success", `${item.item} has been marked as returned.`);
+        await StorageService.removeCachedData('getDashboard'); // Clear cache
+        loadData(true); // Refresh dashboard to remove the item from the list
+      } else {
+        Alert.alert("Error", response.message || "Failed to mark as returned.");
+        setRefreshing(false);
+      }
+    } catch (error) {
+      console.error("Error marking as returned:", error);
       Alert.alert("Error", "An unexpected network error occurred.");
       setRefreshing(false);
     }
@@ -190,12 +227,6 @@ export default function DashboardScreen() {
               color="#8B5CF6"
               onPress={() => navigation.navigate('Scan')}
             />
-            {/* <ActionButton
-              icon="document-text"
-              label="Reports"
-              color="#EF4444"
-              onPress={() => navigation.navigate('Reports')}
-            /> */}
           </ScrollView>
         </View>
 
@@ -203,15 +234,20 @@ export default function DashboardScreen() {
           <View style={styles.content}>
             {/* Summary Grid */}
             <View style={styles.gridRow}>
-              <SummaryCard title="Total Items" value={data.summary?.totalItems} />
-              <SummaryCard title="Items Issued" value={data.summary?.itemsIssued} />
+              <SummaryCard
+                onPress={() => navigation.navigate('Inventory')}
+                title="Total Items"
+                value={data.summary?.totalItems}
+                highlightColor={'#f5f5f5'}
+              />
+              <SummaryCard title="Items Issued" value={data.summary?.itemsIssued} highlightColor={COLORS.primary} />
             </View>
             <View style={styles.gridRow}>
-              <SummaryCard title="Pending Returns" value={data.summary?.pendingReturns} />
+              <SummaryCard title="Pending Returns" value={data.summary?.pendingReturns} highlightColor={COLORS.warning} />
               <SummaryCard
                 title="Low Stock"
                 value={data.summary?.lowStock}
-                highlightColor={data.summary?.lowStock > 0 ? (COLORS.warning || '#F59E0B') : null}
+                highlightColor={data.summary?.lowStock > 0 ? (COLORS.danger || '#F59E0B') : null}
                 onPress={() => setLowStockModalVisible(true)}
               />
             </View>
@@ -219,6 +255,7 @@ export default function DashboardScreen() {
             {/* Pending Returns Section */}
             <Text style={styles.sectionTitle}>Pending Returns</Text>
             {data.pendingReturns?.length ? data.pendingReturns.map((item, i) => {
+              console.log(item);
               const isOverdue = item.overdueDays > 0;
               const statusColor = isOverdue ? (COLORS.danger || '#EF4444') : (COLORS.success || '#10B981');
               return (
@@ -228,10 +265,20 @@ export default function DashboardScreen() {
                     <Text style={styles.cardSub}>Issued to: {item.issuedTo}</Text>
                     <Text style={styles.cardSub}>Due: {item.dueDate}</Text>
                   </View>
-                  <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-                    <Text style={[styles.statusText, { color: statusColor }]}>
-                      {isOverdue ? `+${item.overdueDays} Days Overdue` : 'Due Soon'}
-                    </Text>
+
+                  {/* UPDATE: Added column layout for badge + button */}
+                  <View style={styles.actionColumn}>
+                    <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
+                      <Text style={[styles.statusText, { color: statusColor }]}>
+                        {isOverdue ? `+${item.overdueDays} Days Overdue` : 'Due Soon'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.returnButton}
+                      onPress={() => handleMarkReturned(item)}
+                    >
+                      <Text style={styles.returnButtonText}>Mark Returned</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               );
@@ -316,8 +363,13 @@ const styles = StyleSheet.create({
 
   warningBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: (COLORS.warning || '#F59E0B') + '20', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   warningText: { color: COLORS.warning || '#F59E0B', fontWeight: 'bold' },
+
+  actionColumn: { alignItems: 'flex-end', gap: 8 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   statusText: { fontWeight: 'bold', fontSize: 12 },
+  returnButton: { backgroundColor: COLORS.primary || '#3B82F6', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  returnButtonText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+
   emptyText: { color: COLORS.textMuted, textAlign: 'center', marginVertical: 20 },
 
   // Modal Styles

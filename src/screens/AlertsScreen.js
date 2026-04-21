@@ -1,16 +1,16 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
@@ -44,19 +44,16 @@ export default function AlertsScreen({ navigation }) {
 
   const loadAlertsData = async () => {
     try {
-      // 1. Get User Session & Preferences
       const sessionData = await StorageService.getSession();
       if (sessionData) {
         const parsed = typeof sessionData === 'string' ? JSON.parse(sessionData) : sessionData;
         if (parsed.email) setUserEmail(parsed.email);
         
-        // Load initial toggle state directly from session preference
         if (parsed.emailPreference !== undefined) {
           setEmailAlertsEnabled(parsed.emailPreference === true || String(parsed.emailPreference).toLowerCase() === 'true');
         }
       }
 
-      // 2. Fetch Dashboard Data
       const cachedDash = await StorageService.getCachedData('getDashboard');
       if (cachedDash) setAlerts(cachedDash);
 
@@ -78,7 +75,6 @@ export default function AlertsScreen({ navigation }) {
     loadAlertsData();
   }, []);
 
-  // PREFERENCES HANDLER
   const toggleEmailAlerts = async (newValue) => {
     if (!userEmail) return Alert.alert("Error", "Email not found. Please re-login.");
     setEmailAlertsEnabled(newValue); 
@@ -89,7 +85,6 @@ export default function AlertsScreen({ navigation }) {
         setEmailAlertsEnabled(!newValue);
         Alert.alert("Error", response.message || "Could not update preferences.");
       } else {
-        // Update local session so it remembers next time
         const session = await StorageService.getSession();
         const parsed = typeof session === 'string' ? JSON.parse(session) : session;
         parsed.emailPreference = newValue;
@@ -102,13 +97,12 @@ export default function AlertsScreen({ navigation }) {
     }
   };
 
-  // REQUEST NEGOTIATION HANDLERS
   const handleExpandRequest = (req) => {
     if (expandedReq === req.row) {
-      setExpandedReq(null); // Collapse if already open
+      setExpandedReq(null);
     } else {
       setExpandedReq(req.row);
-      setApproveQty(parseInt(req.qty) || 0); // Default to what they asked for
+      setApproveQty(parseInt(req.qty) || 0);
       setRemarks('');
     }
   };
@@ -145,7 +139,6 @@ export default function AlertsScreen({ navigation }) {
     }
   };
 
-  // UI COMPONENTS
   const FilterChip = ({ label, active, type }) => (
     <TouchableOpacity 
       style={[styles.filterChip, active && styles.filterChipActive]}
@@ -154,6 +147,22 @@ export default function AlertsScreen({ navigation }) {
       <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{label}</Text>
     </TouchableOpacity>
   );
+
+  // Group requests by person
+  const groupedRequests = alerts.requests.reduce((groups, item) => {
+    const person = item.tl || 'Unknown Person';
+    if (!groups[person]) groups[person] = [];
+    groups[person].push(item);
+    return groups;
+  }, {});
+
+  // Group returns by person
+  const groupedReturns = alerts.pendingReturns.reduce((groups, item) => {
+    const person = item.issuedTo || 'Unknown Person';
+    if (!groups[person]) groups[person] = [];
+    groups[person].push(item);
+    return groups;
+  }, {});
 
   return (
     <SafeAreaView style={styles.container}>
@@ -199,71 +208,86 @@ export default function AlertsScreen({ navigation }) {
         ) : (
           <View style={styles.alertsList}>
             
-            {/* 1. REQUESTS ALWAYS ON TOP */}
-            {filters.requests && alerts.requests.map((item, index) => {
-              const isExpanded = expandedReq === item.row;
-              
-              return (
-              <TouchableOpacity 
-                key={`req_${index}`} 
-                activeOpacity={0.8}
-                onPress={() => handleExpandRequest(item)}
-                style={[styles.alertCard, { borderLeftColor: COLORS.primary }]}
-              >
-                <View style={styles.cardHeader}>
-                  <View style={[styles.alertIconBg, { backgroundColor: COLORS.primary + '15' }]}>
-                    <Ionicons name="git-pull-request-outline" size={20} color={COLORS.primary} />
+            {/* 1. REQUESTS ALWAYS ON TOP (Grouped into Single Box per Person) */}
+            {filters.requests && Object.entries(groupedRequests).map(([person, items], groupIndex) => (
+              <View key={`req_group_${groupIndex}`} style={[styles.groupedCard, { borderTopColor: COLORS.primary, borderTopWidth: 4 }]}>
+                
+                {/* Person Header */}
+                <View style={styles.groupedCardHeader}>
+                  <View style={[styles.alertIconBg, { backgroundColor: COLORS.primary + '15', width: 32, height: 32, marginRight: 10 }]}>
+                    <Ionicons name="person-outline" size={16} color={COLORS.primary} />
                   </View>
-                  <View style={styles.alertContent}>
-                    <Text style={styles.alertTitle}>Request: {item.itemName}</Text>
-                    <Text style={styles.alertDesc}>{item.tl} wants {item.qty} units ({item.date}).</Text>
+                  <View>
+                    <Text style={styles.groupedCardTitle}>{person}</Text>
+                    <Text style={styles.groupedCardSub}>{items.length} Pending Request{items.length > 1 ? 's' : ''}</Text>
                   </View>
-                  <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={COLORS.textMuted} />
                 </View>
-
-                {/* Interactive Expandable Section */}
-                {isExpanded && (
-                  <View style={styles.expandedSection}>
-                    <Text style={styles.expandLabel}>Negotiate Quantity (Max: {item.qty})</Text>
-                    <View style={styles.stepperContainer}>
-                      <TouchableOpacity style={styles.stepperBtn} onPress={() => changeQty(-1, item.qty)}>
-                        <Ionicons name="remove" size={20} color={COLORS.text} />
+                
+                {/* Person's Items */}
+                {items.map((item, index) => {
+                  const isExpanded = expandedReq === item.row;
+                  const isLast = index === items.length - 1;
+                  
+                  return (
+                    <View key={`req_${item.row}`} style={[styles.itemRow, isLast && { borderBottomWidth: 0 }]}>
+                      <TouchableOpacity 
+                        activeOpacity={0.7}
+                        onPress={() => handleExpandRequest(item)}
+                        style={styles.itemRowHeader}
+                      >
+                        <View style={styles.alertContent}>
+                          <Text style={styles.alertTitle}>{item.itemName}</Text>
+                          <Text style={styles.alertDesc}>Needs {item.qty} units ({item.date})</Text>
+                        </View>
+                        <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={COLORS.textMuted} />
                       </TouchableOpacity>
-                      <Text style={styles.stepperValue}>{approveQty}</Text>
-                      <TouchableOpacity style={styles.stepperBtn} onPress={() => changeQty(1, item.qty)}>
-                        <Ionicons name="add" size={20} color={COLORS.text} />
-                      </TouchableOpacity>
-                    </View>
 
-                    <Text style={styles.expandLabel}>Admin Remarks</Text>
-                    <TextInput 
-                      style={styles.remarksInput}
-                      placeholder="Add a note (e.g., Short on stock)..."
-                      placeholderTextColor={COLORS.textMuted}
-                      value={remarks}
-                      onChangeText={setRemarks}
-                    />
+                      {/* Interactive Expandable Section */}
+                      {isExpanded && (
+                        <View style={styles.expandedSectionInner}>
+                          <Text style={styles.expandLabel}>Negotiate Quantity (Max: {item.qty})</Text>
+                          <View style={styles.stepperContainer}>
+                            <TouchableOpacity style={styles.stepperBtn} onPress={() => changeQty(-1, item.qty)}>
+                              <Ionicons name="remove" size={20} color={COLORS.text} />
+                            </TouchableOpacity>
+                            <Text style={styles.stepperValue}>{approveQty}</Text>
+                            <TouchableOpacity style={styles.stepperBtn} onPress={() => changeQty(1, item.qty)}>
+                              <Ionicons name="add" size={20} color={COLORS.text} />
+                            </TouchableOpacity>
+                          </View>
 
-                    <TouchableOpacity 
-                      style={styles.approveSubmitBtn} 
-                      onPress={() => submitApproval(item.row)}
-                      disabled={isApproving}
-                    >
-                      {isApproving ? <ActivityIndicator color="#FFF" /> : (
-                        <>
-                          <Ionicons name="checkmark-circle" size={18} color="#FFF" style={{marginRight: 6}} />
-                          <Text style={styles.approveSubmitText}>Approve {approveQty} Units</Text>
-                        </>
+                          <Text style={styles.expandLabel}>Admin Remarks</Text>
+                          <TextInput 
+                            style={styles.remarksInput}
+                            placeholder="Add a note (e.g., Short on stock)..."
+                            placeholderTextColor={COLORS.textMuted}
+                            value={remarks}
+                            onChangeText={setRemarks}
+                          />
+
+                          <TouchableOpacity 
+                            style={styles.approveSubmitBtn} 
+                            onPress={() => submitApproval(item.row)}
+                            disabled={isApproving}
+                          >
+                            {isApproving ? <ActivityIndicator color="#FFF" /> : (
+                              <>
+                                <Ionicons name="checkmark-circle" size={18} color="#FFF" style={{marginRight: 6}} />
+                                <Text style={styles.approveSubmitText}>Approve {approveQty} Units</Text>
+                              </>
+                            )}
+                          </TouchableOpacity>
+                        </View>
                       )}
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </TouchableOpacity>
-            )})}
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
 
-            {/* 2. LOW STOCK */}
+            {/* 2. LOW STOCK (Left as individual alerts since they aren't tied to a person) */}
             {filters.lowStock && alerts.lowStock.map((item, index) => (
-              <View key={`low_${index}`} style={[styles.alertCard, { borderLeftColor: COLORS.danger }]}>
+              <View key={`low_${index}`} style={[styles.alertCard, { borderLeftColor: COLORS.danger, borderLeftWidth: 4 }]}>
                 <View style={styles.cardHeader}>
                   <View style={[styles.alertIconBg, { backgroundColor: COLORS.danger + '15' }]}>
                     <Ionicons name="trending-down" size={20} color={COLORS.danger} />
@@ -276,18 +300,31 @@ export default function AlertsScreen({ navigation }) {
               </View>
             ))}
 
-            {/* 3. OVERDUE RETURNS */}
-            {filters.returns && alerts.pendingReturns.map((item, index) => (
-              <View key={`ret_${index}`} style={[styles.alertCard, { borderLeftColor: COLORS.warning }]}>
-                <View style={styles.cardHeader}>
-                  <View style={[styles.alertIconBg, { backgroundColor: COLORS.warning + '15' }]}>
-                    <Ionicons name="time-outline" size={20} color={COLORS.warning} />
+            {/* 3. OVERDUE RETURNS (Grouped into Single Box per Person) */}
+            {filters.returns && Object.entries(groupedReturns).map(([person, items], groupIndex) => (
+              <View key={`ret_group_${groupIndex}`} style={[styles.groupedCard, { borderTopColor: COLORS.warning, borderTopWidth: 4 }]}>
+                
+                <View style={styles.groupedCardHeader}>
+                  <View style={[styles.alertIconBg, { backgroundColor: COLORS.warning + '15', width: 32, height: 32, marginRight: 10 }]}>
+                    <Ionicons name="person-outline" size={16} color={COLORS.warning} />
                   </View>
-                  <View style={styles.alertContent}>
-                    <Text style={styles.alertTitle}>Overdue: {item.item}</Text>
-                    <Text style={styles.alertDesc}>Issued to {item.issuedTo}. Overdue by {item.overdueDays} days.</Text>
+                  <View>
+                    <Text style={styles.groupedCardTitle}>{person}</Text>
+                    <Text style={styles.groupedCardSub}>{items.length} Overdue Return{items.length > 1 ? 's' : ''}</Text>
                   </View>
                 </View>
+                
+                {items.map((item, index) => {
+                  const isLast = index === items.length - 1;
+                  return (
+                    <View key={`ret_${index}`} style={[styles.itemRow, isLast && { borderBottomWidth: 0 }]}>
+                      <View style={styles.alertContent}>
+                        <Text style={styles.alertTitle}>{item.item}</Text>
+                        <Text style={styles.alertDesc}>Overdue by {item.overdueDays} days.</Text>
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
             ))}
 
@@ -329,19 +366,32 @@ const styles = StyleSheet.create({
   filterChipText: { color: COLORS.textMuted, fontSize: 13, fontWeight: '600' },
   filterChipTextActive: { color: '#FFF' },
 
-  // Alert Cards
-  alertsList: { gap: 12 },
-  alertCard: { backgroundColor: COLORS.card, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, borderLeftWidth: 4, overflow: 'hidden' },
+  alertsList: { gap: 16 },
+
+  // Single Items (e.g. Low Stock)
+  alertCard: { backgroundColor: COLORS.card, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', padding: 16 },
   alertIconBg: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
+  
+  // Grouped Box Containers
+  groupedCard: { backgroundColor: COLORS.card, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden' },
+  groupedCardHeader: { flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: COLORS.inputBg, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  groupedCardTitle: { color: COLORS.text, fontSize: 16, fontWeight: '700' },
+  groupedCardSub: { color: COLORS.textMuted, fontSize: 12, marginTop: 2 },
+  
+  // Inner Rows for Grouped Items
+  itemRow: { padding: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  itemRowHeader: { flexDirection: 'row', alignItems: 'center' },
+
+  // Content Text inside rows/cards
   alertContent: { flex: 1 },
   alertTitle: { color: COLORS.text, fontSize: 15, fontWeight: '700', marginBottom: 4 },
   alertDesc: { color: COLORS.textMuted, fontSize: 13, lineHeight: 18 },
 
-  // Expanded Negotiation Section
-  expandedSection: { padding: 16, paddingTop: 0, borderTopWidth: 1, borderTopColor: COLORS.border, backgroundColor: COLORS.card },
-  expandLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', marginTop: 12, marginBottom: 8 },
-  stepperContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderRadius: 12, alignSelf: 'flex-start', borderWidth: 1, borderColor: COLORS.border },
+  // Expanded Negotiation Section (Adjusted to fit inside a row)
+  expandedSectionInner: { paddingTop: 16, marginTop: 16, borderTopWidth: 1, borderTopColor: COLORS.border },
+  expandLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', marginBottom: 8 },
+  stepperContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderRadius: 12, alignSelf: 'flex-start', borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
   stepperBtn: { padding: 12, paddingHorizontal: 16 },
   stepperValue: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', minWidth: 30, textAlign: 'center' },
   remarksInput: { backgroundColor: COLORS.inputBg, color: COLORS.text, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, fontSize: 14, marginBottom: 16 },

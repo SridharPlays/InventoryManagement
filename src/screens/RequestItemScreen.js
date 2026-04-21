@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,11 +14,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
-import { postToGAS } from '../services/api';
+import { fetchFromGAS, postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 
 export default function RequestItemScreen({ navigation }) {
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [inventory, setInventory] = useState([]);
   const [userName, setUserName] = useState("Team Lead");
 
@@ -26,30 +28,51 @@ export default function RequestItemScreen({ navigation }) {
   const [activeCategory, setActiveCategory] = useState('All');
   const [categories, setCategories] = useState(['All']);
 
-  // Cart State: { itemId: { ...itemDetails, requestQty: number } }
+  // Cart State
   const [cart, setCart] = useState({});
   const [cartModalVisible, setCartModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+
+  // Load Cart every time the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const loadCart = async () => {
+        const savedCart = await StorageService.getCachedData('requestCart');
+        if (savedCart) {
+          setCart(savedCart);
+        }
+      };
+      loadCart();
+    }, [])
+  );
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = async (forceRefresh = false) => {
+    if (!forceRefresh) setIsLoading(true);
+
     try {
-      // Load User Name for the request
       const session = await StorageService.getSession();
       if (session) {
         const parsed = typeof session === 'string' ? JSON.parse(session) : session;
         if (parsed.name) setUserName(parsed.name);
       }
 
-      // Load Inventory
-      const cachedInv = await StorageService.getCachedData('getInventory') || [];
-      const activeItems = cachedInv.filter(item => item.status === 'Active');
+      let inventoryData = [];
 
-      // Extract unique categories
+      if (!forceRefresh) {
+        inventoryData = await StorageService.getCachedData('getInventory') || [];
+      }
+
+      if (inventoryData.length === 0 || forceRefresh) {
+        inventoryData = await fetchFromGAS('getInventory');
+        await StorageService.cacheData('getInventory', inventoryData); // Update cache with fresh data
+      }
+
+      const activeItems = inventoryData.filter(item => item.status === 'Active');
       const uniqueCats = ['All', ...new Set(activeItems.map(item => item.category).filter(Boolean))];
 
       setInventory(activeItems);
@@ -58,8 +81,14 @@ export default function RequestItemScreen({ navigation }) {
       console.error("Error loading data:", error);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false); // Make sure to stop the refresh spinner
     }
   };
+
+  const onRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    loadData(true);
+  }, []);
 
   // CART LOGIC
   const updateQuantity = (item, delta) => {
@@ -74,13 +103,32 @@ export default function RequestItemScreen({ navigation }) {
       } else {
         updatedCart[item.itemId] = { ...item, requestQty: newQty };
       }
+
+      // Save to local storage whenever it changes
+      StorageService.cacheData('requestCart', updatedCart);
       return updatedCart;
     });
   };
 
-  const clearCart = () => {
+  const clearCart = async () => {
     setCart({});
     setCartModalVisible(false);
+    await StorageService.removeCachedData('requestCart'); // Clear from storage
+  };
+
+  const confirmClearCart = () => {
+    Alert.alert(
+      "Clear Cart",
+      "Are you sure you want to remove all items from your request?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear All",
+          style: "destructive",
+          onPress: clearCart // Calls the clearCart function we updated earlier
+        }
+      ]
+    );
   };
 
   // Submit Request
@@ -137,16 +185,17 @@ export default function RequestItemScreen({ navigation }) {
   // UI COMPONENTS
   const renderItemCard = ({ item }) => {
     const cartQty = cart[item.itemId]?.requestQty || 0;
+    const image = item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/caps_logo.png');
 
     return (
       <View style={styles.itemCard}>
         <Image
-          source={{ uri: item.imageUrl || 'https://placehold.co/150/1C1C2A/8F8F9D?text=No+Image' }}
+          source={image}
           style={styles.itemImage}
         />
         <View style={styles.itemDetails}>
           <Text style={styles.itemName} numberOfLines={1}>{item.itemName}</Text>
-          <Text style={styles.itemSub}>{item.category} • ID: {item.itemId}</Text>
+          <Text style={styles.itemSub}>{item.category} • {item.location} | {item.rack}</Text>
           <Text style={styles.itemStock}>Current Stock: {item.openingStock}</Text>
         </View>
 
@@ -230,6 +279,8 @@ export default function RequestItemScreen({ navigation }) {
           renderItem={renderItemCard}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshing={isRefreshing}
+          onRefresh={onRefresh}
         />
       )}
 
@@ -252,9 +303,21 @@ export default function RequestItemScreen({ navigation }) {
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Request Summary</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={() => setCartModalVisible(false)}>
-              <Ionicons name="close" size={24} color={COLORS.textMuted} />
-            </TouchableOpacity>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+              {/* CLEAR ALL BUTTON */}
+              {cartItemCount > 0 && (
+                <TouchableOpacity onPress={confirmClearCart}>
+                  <Text style={{ color: COLORS.danger, fontWeight: '600', fontSize: 14 }}>
+                    Clear All
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity style={styles.closeButton} onPress={() => setCartModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <FlatList
@@ -283,21 +346,21 @@ export default function RequestItemScreen({ navigation }) {
             }
           />
 
-          <View style={styles.modalFooter}>
-            {isSubmitting ? (
-              <ActivityIndicator size="large" color={COLORS.primary} />
-            ) : (
-              <TouchableOpacity
-                style={[styles.submitBtn, cartItemCount === 0 && { opacity: 0.5 }]}
-                onPress={sumbitRequest}
-                disabled={cartItemCount === 0}
-              >
-                <Ionicons name="send" size={20} color="#FFF" style={{ marginRight: 8 }} />
-                <Text style={styles.submitBtnText}>Submit {cartItemCount} Items</Text>
-              </TouchableOpacity>
-            )}
-          </View>
         </SafeAreaView>
+        <View style={styles.modalFooter}>
+          {isSubmitting ? (
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          ) : (
+            <TouchableOpacity
+              style={[styles.submitBtn, cartItemCount === 0 && { opacity: 0.5 }]}
+              onPress={sumbitRequest}
+              disabled={cartItemCount === 0}
+            >
+              <Ionicons name="send" size={20} color="#FFF" style={{ marginRight: 8 }} />
+              <Text style={styles.submitBtnText}>Submit {cartItemCount} Items</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </Modal>
 
     </SafeAreaView>
@@ -316,15 +379,15 @@ const styles = StyleSheet.create({
   searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, marginHorizontal: 16, paddingHorizontal: 16, height: 48, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: 16 },
   searchInput: { flex: 1, color: COLORS.text, marginLeft: 10, fontSize: 15 },
   categoryWrapper: { height: 36 },
-  categoryChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: COLORS.inputBg, borderWidth: 1, borderColor: COLORS.border },
+  categoryChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: COLORS.inputBg, borderWidth: 1, borderColor: COLORS.border },
   categoryChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   categoryChipText: { color: COLORS.textMuted, fontWeight: '600', fontSize: 13 },
   categoryChipTextActive: { color: '#FFF' },
 
   // List
   listContent: { padding: 16, paddingBottom: 100 },
-  itemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card, padding: 12, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
-  itemImage: { width: 50, height: 50, borderRadius: 10, backgroundColor: COLORS.inputBg },
+  itemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card, padding: 12, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
+  itemImage: { width: 70, height: 70, borderRadius: 12, backgroundColor: COLORS.inputBg },
   itemDetails: { flex: 1, marginLeft: 12 },
   itemName: { color: COLORS.text, fontSize: 16, fontWeight: '700', marginBottom: 4 },
   itemSub: { color: COLORS.textMuted, fontSize: 12, marginBottom: 4 },

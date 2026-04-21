@@ -31,5 +31,13 @@ export const CAPS_APPS = [
     color: '#EF4444',
     isDraft: false,
     redirectTo: "Reports"
+  }, 
+  {
+    id: '5',
+    name: 'CAPS Scribe Portal',
+    desc: 'Scribe management portal',
+    image: require('../../assets/images/caps_logo.png'),
+    color: '#8B5CF6',
+    isDraft: true
   }
 ];

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useIsFocused } from '@react-navigation/native'; // <-- Import this
 import { COLORS } from '../constants/theme';
+import { StorageService } from '../services/storage';
 
 export default function ScannerScreen({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
@@ -25,15 +26,19 @@ export default function ScannerScreen({ navigation }) {
     );
   }
 
-  const handleBarcodeScanned = ({ data }) => {
+  const handleBarcodeScanned = async ({ data }) => {
     setScanned(true);
     try {
       const url = new URL(data);
       const cupboardId = url.searchParams.get("cupboard");
       const floorId = url.searchParams.get("floor") || "9";
 
+      const sessionData = await StorageService.getSession();
+      const userRole = sessionData?.role || "";
+      const isAdmin = userRole === "admin";
+
       if (cupboardId) {
-        navigation.navigate("Cupboard", { cupboardId, floorId });
+        navigation.navigate("Cupboard", { cupboardId, floorId, isAdmin });
       } else {
         alert("Invalid QR Code format.");
       }

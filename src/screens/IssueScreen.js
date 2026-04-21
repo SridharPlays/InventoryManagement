@@ -1,15 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image, ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput, TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image, ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput, TouchableOpacity,
+  View,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -24,11 +26,11 @@ export default function IssueScreen({ route, navigation }) {
   const [items, setItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [userData, setUserData] = useState(null);
-  
+
   // Step 1: Select Item, Step 2: Fill Form
-  const [step, setStep] = useState(1); 
+  const [step, setStep] = useState(1);
   const [selectedItem, setSelectedItem] = useState(null);
-  
+
   // Issue Form State
   const [quantity, setQuantity] = useState('');
   const [issuedTo, setIssuedTo] = useState('');
@@ -36,7 +38,7 @@ export default function IssueScreen({ route, navigation }) {
   const [isReturnable, setIsReturnable] = useState(false);
   const [dueDate, setDueDate] = useState('');
   const [remarks, setRemarks] = useState('');
-  
+
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -64,7 +66,7 @@ export default function IssueScreen({ route, navigation }) {
 
   const filteredItems = useMemo(() => {
     if (!searchQuery) return items;
-    return items.filter(item => 
+    return items.filter(item =>
       item.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.itemId.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.category.toLowerCase().includes(searchQuery.toLowerCase())
@@ -82,7 +84,7 @@ export default function IssueScreen({ route, navigation }) {
   const handleQuantityChange = (val) => {
     // Only allow numbers
     const formatted = val.replace(/[^0-9]/g, '');
-    
+
     // Prevent issuing more than available stock
     if (selectedItem && formatted !== '') {
       if (parseInt(formatted) > selectedItem.openingStock) {
@@ -134,15 +136,15 @@ export default function IssueScreen({ route, navigation }) {
     const isOutOfStock = item.openingStock <= 0;
 
     return (
-      <TouchableOpacity 
-        style={[styles.itemCard, isOutOfStock && { opacity: 0.5 }]} 
+      <TouchableOpacity
+        style={[styles.itemCard, isOutOfStock && { opacity: 0.5 }]}
         activeOpacity={0.7}
         onPress={() => handleSelectItem(item)}
       >
         <View style={styles.iconPlaceholder}>
-          <Image 
-            source={item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/caps.png')} 
-            style={{ width: '100%', height: '100%', borderRadius: 8 }} 
+          <Image
+            source={item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/caps.png')}
+            style={{ width: '100%', height: '100%', borderRadius: 8 }}
           />
         </View>
         <View style={styles.itemContent}>
@@ -166,7 +168,7 @@ export default function IssueScreen({ route, navigation }) {
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{step === 1 ? 'Select Item to Issue' : 'Issue Details'}</Text>
-        <View style={{ width: 24 }} /> 
+        <View style={{ width: 24 }} />
       </View>
 
       {step === 1 ? (
@@ -193,114 +195,134 @@ export default function IssueScreen({ route, navigation }) {
         </View>
       ) : (
         // STEP 2: FILL ISSUE FORM
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
-          
-          {/* Selected Item Summary Card */}
-          {selectedItem && (
-            <View style={styles.selectedItemCard}>
-              <Image 
-                source={selectedItem.imageUrl ? { uri: selectedItem.imageUrl } : require('../../assets/images/caps.png')} 
-                style={styles.selectedItemImage} 
-              />
-              <View style={{ flex: 1, marginLeft: 16 }}>
-                <Text style={styles.itemName}>{selectedItem.itemName}</Text>
-                <Text style={styles.itemSub}>ID: {selectedItem.itemId}</Text>
-                <View style={styles.stockBadge}>
-                  <Text style={styles.stockBadgeText}>{selectedItem.openingStock} Available</Text>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
+
+            {/* Selected Item Summary Card */}
+            {selectedItem && (
+              <View style={styles.selectedItemCard}>
+                <Image
+                  source={selectedItem.imageUrl ? { uri: selectedItem.imageUrl } : require('../../assets/images/caps.png')}
+                  style={styles.selectedItemImage}
+                />
+                <View style={{ flex: 1, marginLeft: 16 }}>
+                  <Text style={styles.itemName}>{selectedItem.itemName}</Text>
+                  <Text style={styles.itemSub}>ID: {selectedItem.itemId}</Text>
+                  <View style={styles.stockBadge}>
+                    <Text style={styles.stockBadgeText}>{selectedItem.openingStock} Available</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          )}
+            )}
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Quantity to Issue *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={`Max: ${selectedItem?.openingStock}`}
-              placeholderTextColor={COLORS.textMuted}
-              keyboardType="numeric"
-              value={quantity}
-              onChangeText={handleQuantityChange}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Issued To (Name / ID) *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Who is receiving this?"
-              placeholderTextColor={COLORS.textMuted}
-              value={issuedTo}
-              onChangeText={setIssuedTo}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Purpose (Optional)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Why is it needed?"
-              placeholderTextColor={COLORS.textMuted}
-              value={purpose}
-              onChangeText={setPurpose}
-            />
-          </View>
-
-          {/* Returnable Toggle */}
-          <View style={styles.switchContainer}>
-            <View>
-              <Text style={styles.inputLabel}>Is this item returnable?</Text>
-              <Text style={styles.itemSub}>Will this item be brought back?</Text>
-            </View>
-            <Switch
-              trackColor={{ false: COLORS.border, true: COLORS.primary }}
-              thumbColor={'#fff'}
-              onValueChange={setIsReturnable}
-              value={isReturnable}
-            />
-          </View>
-
-          {isReturnable && (
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Due Date *</Text>
+              <Text style={styles.inputLabel}>Quantity to Issue *</Text>
               <TextInput
                 style={styles.input}
-                placeholder="DD/MM/YYYY"
+                placeholder={`Max: ${selectedItem?.openingStock}`}
                 placeholderTextColor={COLORS.textMuted}
-                value={dueDate}
-                onChangeText={setDueDate}
+                keyboardType="numeric"
+                value={quantity}
+                onChangeText={handleQuantityChange}
               />
             </View>
-          )}
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Remarks (Optional)</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Any extra notes..."
-              placeholderTextColor={COLORS.textMuted}
-              multiline={true}
-              numberOfLines={3}
-              value={remarks}
-              onChangeText={setRemarks}
-            />
-          </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Issued To (Name / ID) *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Who is receiving this?"
+                placeholderTextColor={COLORS.textMuted}
+                value={issuedTo}
+                onChangeText={setIssuedTo}
+              />
+            </View>
 
-          <TouchableOpacity 
-            style={[styles.primaryButton, isLoading && { opacity: 0.7 }, { marginTop: 10, marginBottom: 40 }]} 
-            onPress={submitIssue}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="push-outline" size={20} color="#fff" style={{marginRight: 8}} />
-                <Text style={styles.primaryButtonText}>Confirm Issue</Text>
-              </>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Purpose (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Why is it needed?"
+                placeholderTextColor={COLORS.textMuted}
+                value={purpose}
+                onChangeText={setPurpose}
+              />
+            </View>
+
+            {/* Returnable Toggle */}
+            {/* Returnable Toggle (Yes | No Buttons) */}
+            <View style={styles.switchContainer}>
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <Text style={styles.inputLabel}>Is this item returnable?</Text>
+                <Text style={styles.itemSub}>Will this item be brought back?</Text>
+              </View>
+
+              <View style={styles.toggleGroup}>
+                <TouchableOpacity
+                  style={[styles.toggleButton, isReturnable === true && styles.toggleButtonActive]}
+                  onPress={() => setIsReturnable(true)}
+                >
+                  <Text style={[styles.toggleButtonText, isReturnable === true && styles.toggleButtonTextActive]}>
+                    Yes
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.toggleButton, isReturnable === false && styles.toggleButtonActive]}
+                  onPress={() => setIsReturnable(false)}
+                >
+                  <Text style={[styles.toggleButtonText, isReturnable === false && styles.toggleButtonTextActive]}>
+                    No
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {isReturnable && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Due Date *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="DD/MM/YYYY"
+                  placeholderTextColor={COLORS.textMuted}
+                  value={dueDate}
+                  onChangeText={setDueDate}
+                />
+              </View>
             )}
-          </TouchableOpacity>
-        </ScrollView>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Remarks (Optional)</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Any extra notes..."
+                placeholderTextColor={COLORS.textMuted}
+                multiline={true}
+                numberOfLines={3}
+                value={remarks}
+                onChangeText={setRemarks}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.primaryButton, isLoading && { opacity: 0.7 }, { marginTop: 10, marginBottom: 40 }]}
+              onPress={submitIssue}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.primaryButtonText}>Confirm Issue</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   );
@@ -310,13 +332,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
   headerTitle: { color: COLORS.text, fontSize: 20, fontWeight: 'bold' },
-  
+
   // Step 1 Styles
   searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderRadius: 12, paddingHorizontal: 12, marginBottom: 16 },
   searchIcon: { marginRight: 8 },
   searchInput: { flex: 1, color: COLORS.text, height: 48, fontSize: 15 },
   emptyText: { color: COLORS.textMuted, textAlign: 'center', marginTop: 40 },
-  
+
   itemCard: { flexDirection: 'row', backgroundColor: COLORS.card, padding: 12, borderRadius: 12, marginBottom: 12, alignItems: 'center' },
   iconPlaceholder: { width: 50, height: 50, borderRadius: 8, backgroundColor: COLORS.inputBg, marginRight: 12 },
   itemContent: { flex: 1 },
@@ -338,6 +360,29 @@ const styles = StyleSheet.create({
   textArea: { height: 80, paddingTop: 14, textAlignVertical: 'top' },
 
   switchContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.inputBg, padding: 16, borderRadius: 12, marginBottom: 16 },
+
+  toggleGroup: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.background, 
+    borderRadius: 8,
+    padding: 4,
+  },
+  toggleButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  toggleButtonActive: {
+    backgroundColor: COLORS.primary,
+  },
+  toggleButtonText: {
+    color: COLORS.textMuted,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  toggleButtonTextActive: {
+    color: '#fff',
+  },
 
   primaryButton: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
