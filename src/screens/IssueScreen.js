@@ -143,13 +143,13 @@ export default function IssueScreen({ route, navigation }) {
       >
         <View style={styles.iconPlaceholder}>
           <Image
-            source={item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/caps.png')}
+            source={item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/caps_logo.png')}
             style={{ width: '100%', height: '100%', borderRadius: 8 }}
           />
         </View>
         <View style={styles.itemContent}>
           <Text style={styles.itemName} numberOfLines={1}>{item.itemName}</Text>
-          <Text style={styles.itemSub}>{item.itemId} • {item.location}</Text>
+          <Text style={styles.itemSub}>{item.category} • {item.location}</Text>
         </View>
         <View style={styles.itemTrailing}>
           <Text style={[styles.stockText, isOutOfStock && { color: COLORS.danger || '#EF4444' }]}>

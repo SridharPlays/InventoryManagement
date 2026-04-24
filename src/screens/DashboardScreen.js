@@ -21,6 +21,7 @@ export default function DashboardScreen() {
   const [data, setData] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isLowStockModalVisible, setLowStockModalVisible] = useState(false);
+  const [isItemIssuedModalVisible, setItemIssuedModalVisible] = useState(false);
 
   const parseLowStockData = (lowStockArray) => {
     if (!lowStockArray || !Array.isArray(lowStockArray)) return [];
@@ -240,7 +241,7 @@ export default function DashboardScreen() {
                 value={data.summary?.totalItems}
                 highlightColor={'#f5f5f5'}
               />
-              <SummaryCard title="Items Issued" value={data.summary?.itemsIssued} highlightColor={COLORS.primary} />
+              <SummaryCard title="Items Issued" value={data.summary?.itemsIssued} highlightColor={COLORS.primary} onPress={() => setItemIssuedModalVisible(true)} />
             </View>
             <View style={styles.gridRow}>
               <SummaryCard title="Pending Returns" value={data.summary?.pendingReturns} highlightColor={COLORS.warning} />
@@ -327,6 +328,60 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               )) : (
                 <Text style={styles.emptyText}>Inventory levels look good. 👍</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ITEMS ISSUED MODAL */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isItemIssuedModalVisible}
+        onRequestClose={() => setItemIssuedModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Items Issued</Text>
+              <TouchableOpacity onPress={() => setItemIssuedModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+              {data?.pendingReturns?.length ? data.pendingReturns.map((item, i) => {
+                const isOverdue = item.overdueDays > 0;
+                const statusColor = isOverdue ? (COLORS.danger || '#EF4444') : (COLORS.success || '#10B981');
+
+                return (
+                  <View key={`issued-${i}`} style={styles.listCard}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardTitle}>{item.item}</Text>
+                      <Text style={styles.cardSub}>Issued to: {item.issuedTo}</Text>
+                      <Text style={styles.cardSub}>Due: {item.dueDate}</Text>
+                    </View>
+                    <View style={styles.actionColumn}>
+                      <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
+                        <Text style={[styles.statusText, { color: statusColor }]}>
+                          {isOverdue ? `+${item.overdueDays} Days Overdue` : 'Due Soon'}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.returnButton}
+                        onPress={() => {
+                          setItemIssuedModalVisible(false);
+                          handleMarkReturned(item);
+                        }}
+                      >
+                        <Text style={styles.returnButtonText}>Mark Returned</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              }) : (
+                <Text style={styles.emptyText}>No items currently issued. ✅</Text>
               )}
             </ScrollView>
           </View>

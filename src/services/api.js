@@ -1,6 +1,7 @@
 import { StorageService } from './storage';
 
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbytKDkGF7g4JRYsksK5VMtkSMlI3Biu4hUJIE2heukxO8mruHRaIRULYwsxwNWCG0Rq/exec';
+// const GAS_URL = 'https://script.google.com/macros/s/AKfycbytKDkGF7g4JRYsksK5VMtkSMlI3Biu4hUJIE2heukxO8mruHRaIRULYwsxwNWCG0Rq/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzyURMe1zXn5zccSycaStmH4OCVb4WWTDI2kLIroL03lPDMyoQM0XvJouiJbBilqWQ7/exec';
 
 // GET Requests
 export const fetchFromGAS = async (action) => {

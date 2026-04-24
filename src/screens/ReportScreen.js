@@ -4,9 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image // Added Image import
-  ,
-
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -16,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
-import { postToGAS } from '../services/api';
+import { postToGAS, fetchFromGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 
 import { MONTHS, YEARS } from '../constants/time';
@@ -47,8 +45,25 @@ export default function ReportScreen() {
 
   useEffect(() => {
     const loadInitData = async () => {
-      const cachedInv = await StorageService.getCachedData('getInventory') || [];
-      setInventory(cachedInv);
+      const cachedInv = await StorageService.getCachedData('getInventory');
+
+      if (cachedInv && cachedInv.length > 0) {
+        setInventory(cachedInv);
+      } else {
+        try {
+          const response = await fetchFromGAS('getInventory');
+          if (response.success && response.data) {
+            setInventory(response.data);
+            await StorageService.cacheData('getInventory', response.data);
+          } else {
+            console.log("Error fetching inventory");
+          }
+        } catch (error) {
+          console.error("Error fetching inventory:", error);
+          setInventory([]);
+        }
+      }
+
 
       const userSession = await StorageService.getSession();
       if (userSession) {
@@ -104,10 +119,20 @@ export default function ReportScreen() {
     let reportTitle = "";
     let data = [];
 
+    console.log(inventory)
+    if (inventory.length === 0) {
+      Alert.alert("No Data", "Inventory data is not available right now. Please try again later.");
+      return;
+    }
+
     switch (type) {
       case 'lowStock':
         reportTitle = "Low Stock Report";
-        data = inventory.filter(item => item.openingStock <= item.minStock && item.ignoreLowStock !== 'Yes' && item.status !== 'Inactive');
+        data = inventory.filter(item =>
+          item.status === 'Active' &&
+          item.openingStock <= item.minStock &&
+          item.ignoreLowStock?.trim().toLowerCase() !== 'yes'
+        );
         break;
       case 'all':
         reportTitle = "All Items Master Report";

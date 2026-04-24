@@ -77,13 +77,9 @@ export default function StockInScreen() {
         try {
             const storedInventory = await StorageService.getCachedData("getInventory");
 
-            // If your StorageService returns a stringified JSON, parse it. 
-            // If it already returns an object/array, you can remove the JSON.parse.
-            const parsedData = typeof storedInventory === 'string' ? JSON.parse(storedInventory) : storedInventory;
-
-            if (parsedData && Array.isArray(parsedData)) {
-                setInventoryList(parsedData);
-                setFilteredList(parsedData);
+            if (storedInventory && Array.isArray(storedInventory)) {
+                setInventoryList(storedInventory);
+                setFilteredList(storedInventory);
             } else {
                 console.log("No valid inventory array found in local storage.");
             }
@@ -376,7 +372,10 @@ export default function StockInScreen() {
                                         }}
                                     >
                                         <Text style={styles.modalItemName}>{item.itemName}</Text>
-                                        <Text style={styles.modalItemSub}>{item.itemId} • Stock Available: {item.openingStock}</Text>
+                                        <View style={{ flexDirection: 'row', marginTop: 4, alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <Text style={styles.modalItemSub}>{item.category} • {item.location} • {item.rack}</Text> 
+                                        <Text style={{color: item.openingStock < item.minStock ? COLORS.danger : COLORS.primary}}>Stock Available: {item.openingStock}</Text>
+                                        </View>
                                     </TouchableOpacity>
                                 )}
                                 ListEmptyComponent={<Text style={styles.emptyText}>No items found</Text>}

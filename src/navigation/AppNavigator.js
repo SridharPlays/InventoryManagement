@@ -22,6 +22,7 @@ import ScannerScreen from '../screens/ScannerScreen';
 import SignInScreen from '../screens/SignInScreen';
 import StockInScreen from '../screens/StockInScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import QuickTakeoutScreen from '../screens/QuickTakeoutScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -45,6 +46,7 @@ function BottomTabs({ userData, setToken }) {
           else if (route.name === 'Alerts') iconName = focused ? 'notifications' : 'notifications-outline';
           else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
           else if (route.name === 'Request') iconName = focused ? 'add-circle' : 'add-circle-outline';
+          else if (route.name === 'QuickTakeout') iconName = focused ? 'flash' : 'flash-outline';
           return <Ionicons name={iconName} size={size} color={color} />;
         },
       })}
@@ -61,6 +63,11 @@ function BottomTabs({ userData, setToken }) {
         <Tab.Screen name="Request">
           {(props) => <RequestItemScreen {...props} userData={userData} />}
         </Tab.Screen>
+      )}
+
+      {/* QUICK TAKEOUT TAB */}
+      {!isAdmin && (
+        <Tab.Screen name="QuickTakeout" component={QuickTakeoutScreen} />
       )}
 
       {/* ADMIN ONLY TAB */}

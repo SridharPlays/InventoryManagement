@@ -41,6 +41,7 @@ export default function AlertsScreen({ navigation }) {
   const [approveQty, setApproveQty] = useState(0);
   const [remarks, setRemarks] = useState('');
   const [isApproving, setIsApproving] = useState(false);
+  const [isDeclining, setIsDeclining] = useState(false);
 
   const loadAlertsData = async () => {
     try {
@@ -136,6 +137,28 @@ export default function AlertsScreen({ navigation }) {
       Alert.alert("Error", "Network error.");
     } finally {
       setIsApproving(false);
+    }
+  };
+
+  const submitDecline = async (rowNumber) => {
+    setIsDeclining(true);
+    try {
+      const response = await postToGAS('declineRequest', { 
+        rowNumber: rowNumber,
+        remarks: remarks
+      });
+
+      if (response.success) {
+        Alert.alert("Declined", "The request has been declined.");
+        setExpandedReq(null);
+        onRefresh();
+      } else {
+        Alert.alert("Error", response.message);
+      }
+    } catch (e) {
+      Alert.alert("Error", "Network error.");
+    } finally {
+      setIsDeclining(false);
     }
   };
 
@@ -265,18 +288,35 @@ export default function AlertsScreen({ navigation }) {
                             onChangeText={setRemarks}
                           />
 
-                          <TouchableOpacity 
-                            style={styles.approveSubmitBtn} 
-                            onPress={() => submitApproval(item.row)}
-                            disabled={isApproving}
-                          >
-                            {isApproving ? <ActivityIndicator color="#FFF" /> : (
-                              <>
-                                <Ionicons name="checkmark-circle" size={18} color="#FFF" style={{marginRight: 6}} />
-                                <Text style={styles.approveSubmitText}>Approve {approveQty} Units</Text>
-                              </>
-                            )}
-                          </TouchableOpacity>
+                          {/* Action Buttons Row */}
+                          <View style={styles.actionButtonsRow}>
+                            <TouchableOpacity 
+                              style={[styles.actionBtn, styles.declineBtn]} 
+                              onPress={() => submitDecline(item.row)}
+                              disabled={isDeclining || isApproving}
+                            >
+                              {isDeclining ? <ActivityIndicator color="#FFF" /> : (
+                                <>
+                                  <Ionicons name="close-circle" size={18} color="#FFF" style={{marginRight: 6}} />
+                                  <Text style={styles.actionBtnText}>Decline</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                              style={[styles.actionBtn, styles.approveBtn]} 
+                              onPress={() => submitApproval(item.row)}
+                              disabled={isApproving || isDeclining}
+                            >
+                              {isApproving ? <ActivityIndicator color="#FFF" /> : (
+                                <>
+                                  <Ionicons name="checkmark-circle" size={18} color="#FFF" style={{marginRight: 6}} />
+                                  <Text style={styles.actionBtnText}>Approve {approveQty}</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          </View>
+
                         </View>
                       )}
                     </View>
@@ -285,7 +325,7 @@ export default function AlertsScreen({ navigation }) {
               </View>
             ))}
 
-            {/* 2. LOW STOCK (Left as individual alerts since they aren't tied to a person) */}
+            {/* 2. LOW STOCK */}
             {filters.lowStock && alerts.lowStock.map((item, index) => (
               <View key={`low_${index}`} style={[styles.alertCard, { borderLeftColor: COLORS.danger, borderLeftWidth: 4 }]}>
                 <View style={styles.cardHeader}>
@@ -300,7 +340,7 @@ export default function AlertsScreen({ navigation }) {
               </View>
             ))}
 
-            {/* 3. OVERDUE RETURNS (Grouped into Single Box per Person) */}
+            {/* 3. OVERDUE RETURNS */}
             {filters.returns && Object.entries(groupedReturns).map(([person, items], groupIndex) => (
               <View key={`ret_group_${groupIndex}`} style={[styles.groupedCard, { borderTopColor: COLORS.warning, borderTopWidth: 4 }]}>
                 
@@ -388,15 +428,20 @@ const styles = StyleSheet.create({
   alertTitle: { color: COLORS.text, fontSize: 15, fontWeight: '700', marginBottom: 4 },
   alertDesc: { color: COLORS.textMuted, fontSize: 13, lineHeight: 18 },
 
-  // Expanded Negotiation Section (Adjusted to fit inside a row)
+  // Expanded Negotiation Section
   expandedSectionInner: { paddingTop: 16, marginTop: 16, borderTopWidth: 1, borderTopColor: COLORS.border },
   expandLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', marginBottom: 8 },
   stepperContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderRadius: 12, alignSelf: 'flex-start', borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
   stepperBtn: { padding: 12, paddingHorizontal: 16 },
   stepperValue: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', minWidth: 30, textAlign: 'center' },
   remarksInput: { backgroundColor: COLORS.inputBg, color: COLORS.text, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, fontSize: 14, marginBottom: 16 },
-  approveSubmitBtn: { flexDirection: 'row', backgroundColor: COLORS.success, padding: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  approveSubmitText: { color: '#FFF', fontSize: 15, fontWeight: 'bold' },
+  
+  // Action Buttons
+  actionButtonsRow: { flexDirection: 'row', gap: 12 },
+  actionBtn: { flex: 1, flexDirection: 'row', padding: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  approveBtn: { backgroundColor: COLORS.success },
+  declineBtn: { backgroundColor: COLORS.danger },
+  actionBtnText: { color: '#FFF', fontSize: 15, fontWeight: 'bold' },
 
   // Empty State
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 50 },

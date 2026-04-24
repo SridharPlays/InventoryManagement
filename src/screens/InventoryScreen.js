@@ -2,18 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    Modal,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -28,9 +28,9 @@ const CustomDropdown = ({ label, options, selectedValue, onSelect, placeholder }
   return (
     <View style={styles.customDropdownContainer}>
       <Text style={styles.inputLabel}>{label}</Text>
-      
-      <TouchableOpacity 
-        style={styles.dropdownSelector} 
+
+      <TouchableOpacity
+        style={styles.dropdownSelector}
         activeOpacity={0.7}
         onPress={() => setIsExpanded(!isExpanded)}
       >
@@ -43,7 +43,7 @@ const CustomDropdown = ({ label, options, selectedValue, onSelect, placeholder }
       {isExpanded && (
         <View style={styles.dropdownListContainer}>
           <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.dropdownOption, !selectedValue && styles.dropdownOptionSelected]}
               onPress={() => { onSelect(''); setIsExpanded(false); }}
             >
@@ -53,7 +53,7 @@ const CustomDropdown = ({ label, options, selectedValue, onSelect, placeholder }
             </TouchableOpacity>
 
             {options.map((option) => (
-              <TouchableOpacity 
+              <TouchableOpacity
                 key={option}
                 style={[styles.dropdownOption, selectedValue === option && styles.dropdownOptionSelected]}
                 onPress={() => { onSelect(option); setIsExpanded(false); }}
@@ -82,10 +82,10 @@ export default function InventoryScreen({ navigation }) {
   const [activeCupboard, setActiveCupboard] = useState('');
   const [tempFloor, setTempFloor] = useState('');
   const [tempCupboard, setTempCupboard] = useState('');
-  
+
   // ITEM INTERACTION STATES
-  const [selectedItem, setSelectedItem] = useState(null); // For regular tap (View Only)
-  
+  const [selectedItem, setSelectedItem] = useState(null);
+
   // EDIT STATES
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
@@ -95,11 +95,28 @@ export default function InventoryScreen({ navigation }) {
     setRefreshing(true);
     try {
       let inventoryData = null;
-      if (!forceRefresh) inventoryData = await StorageService.getCachedData('getInventory');
-      if (forceRefresh || !inventoryData) inventoryData = await fetchFromGAS('getInventory');
-      if (inventoryData) setItems(inventoryData);
+
+      if (!forceRefresh) {
+        inventoryData = await StorageService.getCachedData('getInventory');
+      }
+
+      if (forceRefresh || !inventoryData) {
+        inventoryData = await fetchFromGAS('getInventory');
+        await StorageService.cacheData('getInventory', inventoryData);
+      }
+
+      if (Array.isArray(inventoryData)) {
+        setItems(inventoryData);
+      } else if (Array.isArray(inventoryData?.data)) {
+        setItems(inventoryData.data);
+      } else {
+        console.error("Invalid data:", inventoryData);
+        setItems([]);
+      }
+
     } catch (error) {
       console.error("Inventory Data Error:", error);
+      setItems([]);
     } finally {
       setRefreshing(false);
     }
@@ -108,9 +125,13 @@ export default function InventoryScreen({ navigation }) {
   useEffect(() => { loadData(false); }, [loadData]);
 
   // DYNAMIC OPTIONS GENERATOR
-  const uniqueCategories = useMemo(() => Array.from(new Set(items.map(i => i.category).filter(Boolean))).sort(), [items]);
-  const uniqueFloors = useMemo(() => Array.from(new Set(items.map(i => i.location).filter(Boolean))).sort(), [items]);
-  
+  const uniqueCategories = useMemo(() =>
+    Array.from(new Set(items.map(i => i.category).filter(Boolean))).sort(),
+    [items]);
+  const uniqueFloors = useMemo(() =>
+    Array.from(new Set(items.map(i => i.location).filter(Boolean))).sort(),
+    [items]);
+
   const availableCupboards = useMemo(() => {
     const relevantItems = tempFloor ? items.filter(item => item.location === tempFloor) : items;
     return Array.from(new Set(relevantItems.map(item => item.cupboard).filter(Boolean))).sort((a, b) => a.toString().localeCompare(b.toString(), undefined, { numeric: true }));
@@ -124,7 +145,7 @@ export default function InventoryScreen({ navigation }) {
   // FILTER LOGIC
   const filteredItems = useMemo(() => {
     return items.filter(item => {
-      const matchesSearch = !searchQuery || 
+      const matchesSearch = !searchQuery ||
         (item.itemName && item.itemName.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (item.itemId && item.itemId.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (item.category && item.category.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -144,21 +165,21 @@ export default function InventoryScreen({ navigation }) {
       item.itemName,
       "Select an action to manage this item.",
       [
-        { 
-          text: "Relocate", 
-          onPress: () => navigation.navigate('Relocate', { initialItemId: item.itemId }) 
+        {
+          text: "Relocate",
+          onPress: () => navigation.navigate('Relocate', { initialItemId: item.itemId })
         },
-        { 
-          text: "Edit Details", 
-          onPress: () => { 
-            setEditForm({ ...item }); 
-            setIsEditing(true); 
-          } 
+        {
+          text: "Edit Details",
+          onPress: () => {
+            setEditForm({ ...item });
+            setIsEditing(true);
+          }
         },
-        { 
-          text: "Delete", 
-          onPress: () => handleDeleteConfirmation(item), 
-          style: "destructive" 
+        {
+          text: "Delete",
+          onPress: () => handleDeleteConfirmation(item),
+          style: "destructive"
         }
       ],
       { cancelable: true } // Allows tapping outside to close on Android
@@ -169,16 +190,18 @@ export default function InventoryScreen({ navigation }) {
   const handleDeleteConfirmation = (itemToDelete) => {
     Alert.alert("Delete", `Are you sure you want to delete ${itemToDelete.itemName}?`, [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => {
+      {
+        text: "Delete", style: "destructive", onPress: async () => {
           setIsSaving(true);
           const response = await postToGAS('deleteItem', { itemData: itemToDelete });
-          if(response.success){
+          if (response.success) {
             await StorageService.removeCachedData('getInventory');
             loadData(true);
             setSelectedItem(null);
           }
           setIsSaving(false);
-      }}
+        }
+      }
     ]);
   };
 
@@ -222,12 +245,12 @@ export default function InventoryScreen({ navigation }) {
       }
       const updatedData = { ...editForm, imageUrl: finalImageUrl };
       const response = await postToGAS('updateItem', { itemData: updatedData });
-      
+
       if (response.success) {
         Alert.alert("Success", "Item updated successfully.");
         await StorageService.removeCachedData('getInventory');
-        loadData(true); 
-        setIsEditing(false); 
+        loadData(true);
+        setIsEditing(false);
       } else {
         Alert.alert("Error", response.message || "Failed to update item.");
       }
@@ -241,9 +264,9 @@ export default function InventoryScreen({ navigation }) {
   const renderInventoryItem = ({ item }) => {
     if (isGrid) {
       return (
-        <TouchableOpacity 
-          style={styles.gridCardNew} 
-          activeOpacity={0.8} 
+        <TouchableOpacity
+          style={styles.gridCardNew}
+          activeOpacity={0.8}
           onPress={() => setSelectedItem(item)}
           onLongPress={() => handleLongPress(item)} // NATIVE ALERT
         >
@@ -258,9 +281,9 @@ export default function InventoryScreen({ navigation }) {
     }
 
     return (
-      <TouchableOpacity 
-        style={styles.listCard} 
-        activeOpacity={0.7} 
+      <TouchableOpacity
+        style={styles.listCard}
+        activeOpacity={0.7}
         onPress={() => setSelectedItem(item)}
         onLongPress={() => handleLongPress(item)}
       >
@@ -303,16 +326,16 @@ export default function InventoryScreen({ navigation }) {
             </TouchableOpacity>
           )}
         </View>
-        
+
         <TouchableOpacity style={[styles.filterButton, isFilterActive && styles.filterButtonActive]} onPress={() => { setTempFloor(activeFloor); setTempCupboard(activeCupboard); setFilterModalVisible(true); }}>
           <Ionicons name="filter" size={22} color={isFilterActive ? COLORS.text : COLORS.textMuted} />
           {isFilterActive && <View style={styles.activeFilterDot} />}
         </TouchableOpacity>
       </View>
 
-      <FlatList 
+      <FlatList
         data={filteredItems}
-        key={isGrid ? 'grid-view' : 'list-view'} 
+        key={isGrid ? 'grid-view' : 'list-view'}
         numColumns={isGrid ? 2 : 1}
         keyExtractor={(item, index) => item.itemId ? item.itemId.toString() : index.toString()}
         contentContainerStyle={[styles.listContainer, filteredItems.length === 0 && { flex: 1 }]}
@@ -358,47 +381,47 @@ export default function InventoryScreen({ navigation }) {
                     <Image source={selectedItem.imageUrl ? { uri: selectedItem.imageUrl } : require('../../assets/images/caps_logo.png')} style={styles.itemDetailImage} resizeMode="cover" />
                   </View>
                   <Text style={styles.detailTitle}>{selectedItem.itemName}</Text>
-                  
+
                   <View style={styles.detailInfoBox}>
                     <View style={styles.detailRow}><Text style={styles.detailLabel}>Item ID:</Text><Text style={styles.detailValue}>{selectedItem.itemId}</Text></View>
                     <View style={styles.detailRow}><Text style={styles.detailLabel}>Category:</Text><Text style={styles.detailValue}>{selectedItem.category || 'N/A'}</Text></View>
                     <View style={styles.detailRow}><Text style={styles.detailLabel}>Location:</Text><Text style={styles.detailValue}>{selectedItem.location || 'N/A'}</Text></View>
                     <View style={styles.detailRow}><Text style={styles.detailLabel}>Cupboard:</Text><Text style={styles.detailValue}>{selectedItem.cupboard || 'N/A'} - {selectedItem.rack || 'N/A'}</Text></View>
                     <View style={styles.detailRow}><Text style={styles.detailLabel}>Current Stock:</Text>
-                      <Text style={[styles.detailValue, {fontWeight: 'bold', color: COLORS.primary}]}>{selectedItem.openingStock} {selectedItem.unit || ''}</Text>
+                      <Text style={[styles.detailValue, { fontWeight: 'bold', color: COLORS.primary }]}>{selectedItem.openingStock} {selectedItem.unit || ''}</Text>
                     </View>
                   </View>
 
                   <View style={styles.verticalActionContainer}>
-                    <TouchableOpacity 
-                      style={[styles.fullWidthButton, { backgroundColor: '#3B82F6' }]} 
+                    <TouchableOpacity
+                      style={[styles.fullWidthButton, { backgroundColor: '#3B82F6' }]}
                       onPress={() => {
                         const id = selectedItem.itemId;
-                        setSelectedItem(null); 
-                        navigation.navigate('Relocate', { initialItemId: id }); 
+                        setSelectedItem(null);
+                        navigation.navigate('Relocate', { initialItemId: id });
                       }}
                     >
-                      <Ionicons name="swap-horizontal" size={20} color="#fff" style={{marginRight: 8}} />
+                      <Ionicons name="swap-horizontal" size={20} color="#fff" style={{ marginRight: 8 }} />
                       <Text style={styles.fullWidthButtonText}>Relocate Item</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity 
-                      style={[styles.fullWidthButton, { backgroundColor: COLORS.primary }]} 
+                    <TouchableOpacity
+                      style={[styles.fullWidthButton, { backgroundColor: COLORS.primary }]}
                       onPress={() => {
                         setEditForm({ ...selectedItem });
                         setIsEditing(true);
                         setSelectedItem(null);
                       }}
                     >
-                      <Ionicons name="create-outline" size={20} color="#fff" style={{marginRight: 8}} />
+                      <Ionicons name="create-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
                       <Text style={styles.fullWidthButtonText}>Edit Details</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity 
-                      style={[styles.fullWidthButton, { backgroundColor: '#FF3B30' }]} 
+                    <TouchableOpacity
+                      style={[styles.fullWidthButton, { backgroundColor: '#FF3B30' }]}
                       onPress={() => handleDeleteConfirmation(selectedItem)}
                     >
-                      <Ionicons name="trash-outline" size={20} color="#fff" style={{marginRight: 8}} />
+                      <Ionicons name="trash-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
                       <Text style={styles.fullWidthButtonText}>Delete Item</Text>
                     </TouchableOpacity>
                   </View>
@@ -413,82 +436,82 @@ export default function InventoryScreen({ navigation }) {
       <Modal animationType="slide" transparent={true} visible={isEditing} onRequestClose={() => setIsEditing(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.itemModalContent}>
-             <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Edit Item</Text>
-                <TouchableOpacity onPress={() => setIsEditing(false)} disabled={isSaving}>
-                  <Ionicons name="close" size={24} color={COLORS.text} />
-                </TouchableOpacity>
-              </View>
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
-                {editForm && (
-                  <View style={styles.editFormContainer}>
-                    
-                    <View style={styles.itemDetailImageContainer}>
-                      <TouchableOpacity onPress={handlePhotoUpdate} activeOpacity={0.8}>
-                        <Image source={editForm.imageUrl ? { uri: editForm.imageUrl } : require('../../assets/images/caps_logo.png')} style={[styles.itemDetailImage, { opacity: 0.6 }]} resizeMode="cover" />
-                        <View style={styles.imageOverlayText}>
-                          <Ionicons name="camera" size={24} color="#fff" />
-                          <Text style={{color: '#fff', fontWeight: 'bold', marginTop: 4}}>Change Photo</Text>
-                        </View>
-                      </TouchableOpacity>
-                    </View>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Item</Text>
+              <TouchableOpacity onPress={() => setIsEditing(false)} disabled={isSaving}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
+              {editForm && (
+                <View style={styles.editFormContainer}>
 
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Item ID (Read Only)</Text>
-                      <TextInput style={[styles.input, { backgroundColor: COLORS.background, color: COLORS.textMuted }]} value={editForm.itemId} editable={false} />
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Item Name</Text>
-                      <TextInput style={styles.input} value={editForm.itemName} onChangeText={(t) => setEditForm({...editForm, itemName: t})} placeholderTextColor={COLORS.textMuted} />
-                    </View>
-
-                    <CustomDropdown label="Category" options={uniqueCategories} selectedValue={editForm.category} onSelect={(val) => setEditForm({...editForm, category: val})} />
-
-                    <Text style={styles.inputLabel}>Stock Quantity & Unit</Text>
-                    <View style={styles.qtyRow}>
-                      <View style={styles.qtyControls}>
-                        <TouchableOpacity style={styles.qtyBtn} onPress={() => handleQtyChange(-1)}><Text style={styles.qtyBtnText}>-</Text></TouchableOpacity>
-                        <TextInput 
-                          style={styles.qtyInput} 
-                          keyboardType="numeric" 
-                          value={String(editForm.openingStock)} 
-                          onChangeText={(t) => setEditForm({...editForm, openingStock: t.replace(/[^0-9]/g, '')})} 
-                        />
-                        <TouchableOpacity style={styles.qtyBtn} onPress={() => handleQtyChange(1)}><Text style={styles.qtyBtnText}>+</Text></TouchableOpacity>
+                  <View style={styles.itemDetailImageContainer}>
+                    <TouchableOpacity onPress={handlePhotoUpdate} activeOpacity={0.8}>
+                      <Image source={editForm.imageUrl ? { uri: editForm.imageUrl } : require('../../assets/images/caps_logo.png')} style={[styles.itemDetailImage, { opacity: 0.6 }]} resizeMode="cover" />
+                      <View style={styles.imageOverlayText}>
+                        <Ionicons name="camera" size={24} color="#fff" />
+                        <Text style={{ color: '#fff', fontWeight: 'bold', marginTop: 4 }}>Change Photo</Text>
                       </View>
-                      <TextInput 
-                        style={[styles.input, { flex: 1, marginLeft: 12 }]} 
-                        placeholder="e.g. pcs, kg" 
-                        placeholderTextColor={COLORS.textMuted}
-                        value={editForm.unit} 
-                        onChangeText={(t) => setEditForm({...editForm, unit: t})} 
-                      />
-                    </View>
-
-                    <CustomDropdown label="Floor Location" options={uniqueFloors} selectedValue={editForm.location} onSelect={(val) => setEditForm({...editForm, location: val, cupboard: ''})} />
-                    <CustomDropdown label="Cupboard" options={editAvailableCupboards} selectedValue={editForm.cupboard} onSelect={(val) => setEditForm({...editForm, cupboard: val})} />
-                    
-                    <Text style={styles.inputLabel}>Rack</Text>
-                    <TextInput 
-                        style={[styles.input, { width: '30%', marginBottom: 24 }]} 
-                        placeholder="e.g. 2A, 3B" 
-                        placeholderTextColor={COLORS.textMuted}
-                        value={editForm.rack} 
-                        onChangeText={(t) => setEditForm({...editForm, rack: t})} 
-                      />
-
-                    <View style={styles.modalActionsRow}>
-                      <TouchableOpacity style={styles.clearButton} onPress={() => setIsEditing(false)} disabled={isSaving}>
-                        <Text style={styles.clearButtonText}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.applyButton, isSaving && {opacity: 0.7}]} onPress={handleSaveUpdate} disabled={isSaving}>
-                        {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.applyButtonText}>Save Changes</Text>}
-                      </TouchableOpacity>
-                    </View>
+                    </TouchableOpacity>
                   </View>
-                )}
-              </ScrollView>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Item ID (Read Only)</Text>
+                    <TextInput style={[styles.input, { backgroundColor: COLORS.background, color: COLORS.textMuted }]} value={editForm.itemId} editable={false} />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Item Name</Text>
+                    <TextInput style={styles.input} value={editForm.itemName} onChangeText={(t) => setEditForm({ ...editForm, itemName: t })} placeholderTextColor={COLORS.textMuted} />
+                  </View>
+
+                  <CustomDropdown label="Category" options={uniqueCategories} selectedValue={editForm.category} onSelect={(val) => setEditForm({ ...editForm, category: val })} />
+
+                  <Text style={styles.inputLabel}>Stock Quantity & Unit</Text>
+                  <View style={styles.qtyRow}>
+                    <View style={styles.qtyControls}>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={() => handleQtyChange(-1)}><Text style={styles.qtyBtnText}>-</Text></TouchableOpacity>
+                      <TextInput
+                        style={styles.qtyInput}
+                        keyboardType="numeric"
+                        value={String(editForm.openingStock)}
+                        onChangeText={(t) => setEditForm({ ...editForm, openingStock: t.replace(/[^0-9]/g, '') })}
+                      />
+                      <TouchableOpacity style={styles.qtyBtn} onPress={() => handleQtyChange(1)}><Text style={styles.qtyBtnText}>+</Text></TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={[styles.input, { flex: 1, marginLeft: 12 }]}
+                      placeholder="e.g. pcs, kg"
+                      placeholderTextColor={COLORS.textMuted}
+                      value={editForm.unit}
+                      onChangeText={(t) => setEditForm({ ...editForm, unit: t })}
+                    />
+                  </View>
+
+                  <CustomDropdown label="Floor Location" options={uniqueFloors} selectedValue={editForm.location} onSelect={(val) => setEditForm({ ...editForm, location: val, cupboard: '' })} />
+                  <CustomDropdown label="Cupboard" options={editAvailableCupboards} selectedValue={editForm.cupboard} onSelect={(val) => setEditForm({ ...editForm, cupboard: val })} />
+
+                  <Text style={styles.inputLabel}>Rack</Text>
+                  <TextInput
+                    style={[styles.input, { width: '30%', marginBottom: 24 }]}
+                    placeholder="e.g. 2A, 3B"
+                    placeholderTextColor={COLORS.textMuted}
+                    value={editForm.rack}
+                    onChangeText={(t) => setEditForm({ ...editForm, rack: t })}
+                  />
+
+                  <View style={styles.modalActionsRow}>
+                    <TouchableOpacity style={styles.clearButton} onPress={() => setIsEditing(false)} disabled={isSaving}>
+                      <Text style={styles.clearButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.applyButton, isSaving && { opacity: 0.7 }]} onPress={handleSaveUpdate} disabled={isSaving}>
+                      {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.applyButtonText}>Save Changes</Text>}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -501,7 +524,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10, alignItems: 'center' },
   headerTitle: { color: COLORS.text, fontSize: 24, fontWeight: 'bold' },
-  
+
   searchContainer: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 16, gap: 10 },
   searchInputWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderRadius: 12, paddingHorizontal: 12 },
   searchIcon: { marginRight: 8 },
@@ -521,32 +544,32 @@ const styles = StyleSheet.create({
   itemSub: { color: COLORS.textMuted, fontSize: 12, lineHeight: 18 },
   listTrailing: { alignItems: 'flex-end' },
   stockText: { color: COLORS.text, fontWeight: 'bold', fontSize: 16 },
-  
+
   gridCardNew: { flex: 1, borderRadius: 16, overflow: 'hidden', aspectRatio: 0.8, backgroundColor: COLORS.card },
   gridImageFull: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   gridOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, paddingTop: 24, backgroundColor: 'rgba(0, 0, 0, 0.65)' },
   gridItemName: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
   gridItemSub: { color: 'rgba(255, 255, 255, 0.8)', fontSize: 12, marginBottom: 6 },
   gridItemCount: { color: COLORS.primary || '#10B981', fontWeight: '900', fontSize: 14 },
-  
+
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end', alignItems: 'center' },
   modalContent: { width: '100%', backgroundColor: COLORS.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40 },
   itemModalContent: { width: '100%', backgroundColor: COLORS.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 20, maxHeight: '90%' },
-  
+
   itemDetailImageContainer: { alignItems: 'center', marginBottom: 16, position: 'relative' },
   itemDetailImage: { width: 120, height: 120, borderRadius: 16, backgroundColor: COLORS.inputBg },
   imageOverlayText: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 16 },
-  
+
   detailTitle: { fontSize: 22, fontWeight: 'bold', color: COLORS.text, textAlign: 'center', marginBottom: 20 },
   detailInfoBox: { backgroundColor: COLORS.inputBg, borderRadius: 12, padding: 16, marginBottom: 24 },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.card },
   detailLabel: { color: COLORS.textMuted, fontSize: 15 },
   detailValue: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
-  
+
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   modalTitle: { color: COLORS.text, fontSize: 20, fontWeight: 'bold' },
   inputLabel: { color: COLORS.text, fontSize: 13, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
-  
+
   customDropdownContainer: { marginBottom: 16 },
   dropdownSelector: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.inputBg, padding: 16, borderRadius: 12 },
   dropdownListContainer: { backgroundColor: COLORS.inputBg, borderRadius: 12, marginTop: 4, borderWidth: 1, borderColor: COLORS.card, overflow: 'hidden' },
