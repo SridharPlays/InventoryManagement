@@ -119,7 +119,6 @@ export default function ReportScreen() {
     let reportTitle = "";
     let data = [];
 
-    console.log(inventory)
     if (inventory.length === 0) {
       Alert.alert("No Data", "Inventory data is not available right now. Please try again later.");
       return;
@@ -284,6 +283,14 @@ export default function ReportScreen() {
   const renderDataRow = ({ item, index }) => {
     const keys = Object.keys(item);
     const primaryTitle = item.itemName || item.Item_Name || item.Category_Name || `Record #${index + 1}`;
+    const keysToShow = ['itemName', 'category', 'location', 'openingStock', 'minStock', 'quantity', 'cupboard', 'rack']; // Example list of keys to show
+    const filteredKeys = keys.filter(key => keysToShow.includes(key));
+    // delete null or empty
+    filteredKeys.forEach(key => {
+      if (!item[key]) {
+        delete item[key];
+      }
+    });
 
     // Check if there is an invoice URL key
     const invoiceUrlKey = keys.find(k => {
@@ -299,7 +306,7 @@ export default function ReportScreen() {
           <Text style={styles.dataRowPrimary}>{primaryTitle}</Text>
         </View>
         <View style={styles.dataRowContent}>
-          {keys.map(key => {
+          {filteredKeys.map(key => {
             if (key === 'Item_Name' || key === 'itemName' || key === 'Category_Name' || key === invoiceUrlKey) return null;
             return (
               <View key={key} style={styles.dataCell}>

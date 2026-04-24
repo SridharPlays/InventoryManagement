@@ -1,18 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+	ActivityIndicator,
+	Alert,
+	FlatList,
+	Image,
+	KeyboardAvoidingView,
+	Platform,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TextInput,
+	TouchableOpacity,
+	View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -54,7 +54,7 @@ export default function QuickTakeoutScreen({ navigation }) {
     );
   }, [items, searchQuery]);
 
-  // --- Cart Operations ---
+  // Cart Operations
   const handleUpdateCart = (item, delta) => {
     setCart(prevCart => {
       const existingItem = prevCart.find(c => c.itemId === item.itemId);
@@ -80,7 +80,7 @@ export default function QuickTakeoutScreen({ navigation }) {
 
   const cartTotalItems = cart.reduce((sum, item) => sum + item.cartQty, 0);
 
-  // --- Checkout Operations ---
+  // Checkout Operations
   const submitTakeout = async () => {
     if (cart.length === 0) return Alert.alert("Empty Cart", "Please add items before checking out.");
     if (!reason.trim()) return Alert.alert("Validation", "Please enter an urgent reason for this takeout.");
@@ -122,7 +122,7 @@ export default function QuickTakeoutScreen({ navigation }) {
     }
   };
 
-  // --- Render Helpers ---
+  // Render Helpers
   const renderItem = ({ item }) => {
     const isOutOfStock = item.openingStock <= 0;
     const cartItem = cart.find(c => c.itemId === item.itemId);
