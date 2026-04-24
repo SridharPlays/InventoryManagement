@@ -1,23 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { COLORS } from '../constants/theme';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
+
+import { useTheme } from '../context/ThemeContext';
 
 export default function ForgotPasswordScreen({ navigation, setToken, setUserData }) {
   const [step, setStep] = useState(1); // 1: Email, 2: Code & New Password
@@ -27,6 +28,9 @@ export default function ForgotPasswordScreen({ navigation, setToken, setUserData
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isPasswordVisible, setPasswordVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
 
   const handleSendCode = async () => {
     if (!email) {
@@ -83,7 +87,7 @@ export default function ForgotPasswordScreen({ navigation, setToken, setUserData
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
         style={{ flex: 1 }}
@@ -94,7 +98,7 @@ export default function ForgotPasswordScreen({ navigation, setToken, setUserData
             onPress={() => navigation.goBack()}
             disabled={isLoading}
           >
-            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+            <Ionicons name="arrow-back" size={24} color={theme.text} />
           </TouchableOpacity>
 
           <Text style={styles.title}>Reset Password</Text>
@@ -111,7 +115,7 @@ export default function ForgotPasswordScreen({ navigation, setToken, setUserData
               <TextInput
                 style={styles.input}
                 placeholder="sridhar@christuniversity.in"
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={theme.textMuted}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
@@ -128,7 +132,7 @@ export default function ForgotPasswordScreen({ navigation, setToken, setUserData
                 <TextInput
                   style={styles.input}
                   placeholder="Enter 6-digit code"
-                  placeholderTextColor={COLORS.textMuted}
+                  placeholderTextColor={theme.textMuted}
                   keyboardType="number-pad"
                   value={code}
                   onChangeText={setCode}
@@ -142,7 +146,7 @@ export default function ForgotPasswordScreen({ navigation, setToken, setUserData
                   <TextInput
                     style={styles.inputPassword}
                     placeholder="••••••••••"
-                    placeholderTextColor={COLORS.textMuted}
+                    placeholderTextColor={theme.textMuted}
                     secureTextEntry={!isPasswordVisible}
                     value={newPassword}
                     onChangeText={setNewPassword}
@@ -152,7 +156,7 @@ export default function ForgotPasswordScreen({ navigation, setToken, setUserData
                     <Ionicons
                       name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
                       size={20}
-                      color={COLORS.textMuted}
+                      color={theme.textMuted}
                     />
                   </TouchableOpacity>
                 </View>
@@ -164,7 +168,7 @@ export default function ForgotPasswordScreen({ navigation, setToken, setUserData
                   <TextInput
                     style={styles.inputPassword}
                     placeholder="••••••••••"
-                    placeholderTextColor={COLORS.textMuted}
+                    placeholderTextColor={theme.textMuted}
                     secureTextEntry={!isPasswordVisible}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
@@ -181,7 +185,7 @@ export default function ForgotPasswordScreen({ navigation, setToken, setUserData
             disabled={isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color={COLORS.text} />
+              <ActivityIndicator color={theme.text} />
             ) : (
               <Text style={styles.primaryButtonText}>
                 {step === 1 ? 'Send Code' : 'Reset & Log In'}
@@ -194,17 +198,17 @@ export default function ForgotPasswordScreen({ navigation, setToken, setUserData
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const getStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
   scrollContent: { padding: 24, paddingTop: 20 },
   backButton: { marginBottom: 30, alignSelf: 'flex-start' },
-  title: { color: COLORS.text, fontSize: 28, fontWeight: '700', marginBottom: 10 },
-  subtitle: { color: COLORS.textMuted, fontSize: 15, marginBottom: 30, lineHeight: 22 },
+  title: { color: theme.text, fontSize: 28, fontWeight: '700', marginBottom: 10 },
+  subtitle: { color: theme.textMuted, fontSize: 15, marginBottom: 30, lineHeight: 22 },
   inputContainer: { marginBottom: 20 },
-  inputLabel: { color: COLORS.text, fontSize: 13, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
-  input: { backgroundColor: COLORS.inputBg, color: COLORS.text, padding: 16, borderRadius: 12, fontSize: 15 },
-  passwordWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderRadius: 12, paddingRight: 16 },
-  inputPassword: { flex: 1, color: COLORS.text, padding: 16, fontSize: 15 },
-  primaryButton: { backgroundColor: COLORS.primary, width: '100%', paddingVertical: 16, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', height: 56, marginTop: 10 },
-  primaryButtonText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
+  inputLabel: { color: theme.text, fontSize: 13, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
+  input: { backgroundColor: theme.inputBg, color: theme.text, padding: 16, borderRadius: 12, fontSize: 15 },
+  passwordWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 12, paddingRight: 16 },
+  inputPassword: { flex: 1, color: theme.text, padding: 16, fontSize: 15 },
+  primaryButton: { backgroundColor: theme.primary, width: '100%', paddingVertical: 16, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', height: 56, marginTop: 10 },
+  primaryButtonText: { color: theme.background, fontSize: 16, fontWeight: '600' },
 });

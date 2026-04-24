@@ -1,27 +1,31 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image, ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput, TouchableOpacity,
-  View,
-  KeyboardAvoidingView,
-  Platform
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput, TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { COLORS } from '../constants/theme';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
+
+import { useTheme } from '../context/ThemeContext';
 
 export default function IssueScreen({ route, navigation }) {
   // If navigating from Inventory screen, we might pass an initial item ID
   const initialItemId = route.params?.initialItemId || null;
+
+  const theme = useTheme();
+  const styles = getStyles(theme);
 
   const [items, setItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -152,7 +156,7 @@ export default function IssueScreen({ route, navigation }) {
           <Text style={styles.itemSub}>{item.category} • {item.location}</Text>
         </View>
         <View style={styles.itemTrailing}>
-          <Text style={[styles.stockText, isOutOfStock && { color: COLORS.danger || '#EF4444' }]}>
+          <Text style={[styles.stockText, isOutOfStock && { color: theme.danger || '#EF4444' }]}>
             {item.openingStock} {item.unit}
           </Text>
           <Text style={styles.stockLabel}>Available</Text>
@@ -162,10 +166,10 @@ export default function IssueScreen({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => step === 2 && !initialItemId ? setStep(1) : navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{step === 1 ? 'Select Item to Issue' : 'Issue Details'}</Text>
         <View style={{ width: 24 }} />
@@ -175,11 +179,11 @@ export default function IssueScreen({ route, navigation }) {
         // STEP 1: SELECT ITEM
         <View style={{ flex: 1, paddingHorizontal: 16 }}>
           <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
+            <Ionicons name="search" size={20} color={theme.textMuted} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search by name or ID..."
-              placeholderTextColor={COLORS.textMuted}
+              placeholderTextColor={theme.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
@@ -206,7 +210,7 @@ export default function IssueScreen({ route, navigation }) {
             {selectedItem && (
               <View style={styles.selectedItemCard}>
                 <Image
-                  source={selectedItem.imageUrl ? { uri: selectedItem.imageUrl } : require('../../assets/images/caps.png')}
+                  source={selectedItem.imageUrl ? { uri: selectedItem.imageUrl } : require('../../assets/images/caps_logo.png')}
                   style={styles.selectedItemImage}
                 />
                 <View style={{ flex: 1, marginLeft: 16 }}>
@@ -224,7 +228,7 @@ export default function IssueScreen({ route, navigation }) {
               <TextInput
                 style={styles.input}
                 placeholder={`Max: ${selectedItem?.openingStock}`}
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={theme.textMuted}
                 keyboardType="numeric"
                 value={quantity}
                 onChangeText={handleQuantityChange}
@@ -236,7 +240,7 @@ export default function IssueScreen({ route, navigation }) {
               <TextInput
                 style={styles.input}
                 placeholder="Who is receiving this?"
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={theme.textMuted}
                 value={issuedTo}
                 onChangeText={setIssuedTo}
               />
@@ -247,7 +251,7 @@ export default function IssueScreen({ route, navigation }) {
               <TextInput
                 style={styles.input}
                 placeholder="Why is it needed?"
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={theme.textMuted}
                 value={purpose}
                 onChangeText={setPurpose}
               />
@@ -288,7 +292,7 @@ export default function IssueScreen({ route, navigation }) {
                 <TextInput
                   style={styles.input}
                   placeholder="DD/MM/YYYY"
-                  placeholderTextColor={COLORS.textMuted}
+                  placeholderTextColor={theme.textMuted}
                   value={dueDate}
                   onChangeText={setDueDate}
                 />
@@ -300,7 +304,7 @@ export default function IssueScreen({ route, navigation }) {
               <TextInput
                 style={[styles.input, styles.textArea]}
                 placeholder="Any extra notes..."
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={theme.textMuted}
                 multiline={true}
                 numberOfLines={3}
                 value={remarks}
@@ -328,42 +332,42 @@ export default function IssueScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const getStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
-  headerTitle: { color: COLORS.text, fontSize: 20, fontWeight: 'bold' },
+  headerTitle: { color: theme.text, fontSize: 20, fontWeight: 'bold' },
 
   // Step 1 Styles
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderRadius: 12, paddingHorizontal: 12, marginBottom: 16 },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 12, paddingHorizontal: 12, marginBottom: 16 },
   searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, color: COLORS.text, height: 48, fontSize: 15 },
-  emptyText: { color: COLORS.textMuted, textAlign: 'center', marginTop: 40 },
+  searchInput: { flex: 1, color: theme.text, height: 48, fontSize: 15 },
+  emptyText: { color: theme.textMuted, textAlign: 'center', marginTop: 40 },
 
-  itemCard: { flexDirection: 'row', backgroundColor: COLORS.card, padding: 12, borderRadius: 12, marginBottom: 12, alignItems: 'center' },
-  iconPlaceholder: { width: 50, height: 50, borderRadius: 8, backgroundColor: COLORS.inputBg, marginRight: 12 },
+  itemCard: { flexDirection: 'row', backgroundColor: theme.card, padding: 12, borderRadius: 12, marginBottom: 12, alignItems: 'center' },
+  iconPlaceholder: { width: 50, height: 50, borderRadius: 8, backgroundColor: theme.inputBg, marginRight: 12 },
   itemContent: { flex: 1 },
-  itemName: { color: COLORS.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-  itemSub: { color: COLORS.textMuted, fontSize: 13 },
+  itemName: { color: theme.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
+  itemSub: { color: theme.textMuted, fontSize: 13 },
   itemTrailing: { alignItems: 'flex-end' },
-  stockText: { color: COLORS.primary, fontSize: 18, fontWeight: 'bold' },
-  stockLabel: { color: COLORS.textMuted, fontSize: 11, marginTop: 2 },
+  stockText: { color: theme.primary, fontSize: 18, fontWeight: 'bold' },
+  stockLabel: { color: theme.textMuted, fontSize: 11, marginTop: 2 },
 
   // Step 2 Styles
-  selectedItemCard: { flexDirection: 'row', backgroundColor: COLORS.primary + '15', padding: 16, borderRadius: 16, marginBottom: 24, alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary + '30' },
-  selectedItemImage: { width: 60, height: 60, borderRadius: 12, backgroundColor: COLORS.inputBg },
-  stockBadge: { backgroundColor: COLORS.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start', marginTop: 8 },
-  stockBadgeText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  selectedItemCard: { flexDirection: 'row', backgroundColor: theme.primary + '15', padding: 16, borderRadius: 24, marginBottom: 24, alignItems: 'center', borderWidth: 2, borderColor: theme.primary + '30' },
+  selectedItemImage: { width: 60, height: 60, borderRadius: 12, backgroundColor: theme.inputBg },
+  stockBadge: { backgroundColor: theme.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start', marginTop: 8 },
+  stockBadgeText: { color: theme.text, fontSize: 12, fontWeight: 'bold' },
 
   inputGroup: { marginBottom: 16 },
-  inputLabel: { color: COLORS.text, fontSize: 14, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
-  input: { backgroundColor: COLORS.inputBg, color: COLORS.text, borderRadius: 12, paddingHorizontal: 16, height: 52, fontSize: 15 },
+  inputLabel: { color: theme.text, fontSize: 14, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
+  input: { backgroundColor: theme.inputBg, color: theme.text, borderRadius: 12, paddingHorizontal: 16, height: 52, fontSize: 15, borderColor: theme.inputBg + '10', borderWidth: 1 },
   textArea: { height: 80, paddingTop: 14, textAlignVertical: 'top' },
 
-  switchContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.inputBg, padding: 16, borderRadius: 12, marginBottom: 16 },
+  switchContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.inputBg, padding: 16, borderRadius: 12, marginBottom: 16, borderColor: theme.inputBg + '10', borderWidth: 1},
 
   toggleGroup: {
     flexDirection: 'row',
-    backgroundColor: COLORS.background, 
+    backgroundColor: theme.primary, 
     borderRadius: 8,
     padding: 4,
   },
@@ -373,17 +377,17 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   toggleButtonActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: theme.text,
   },
   toggleButtonText: {
-    color: COLORS.textMuted,
+    color: theme.textMuted,
     fontSize: 14,
     fontWeight: '600',
   },
   toggleButtonTextActive: {
-    color: '#fff',
+    color: theme.text,
   },
 
-  primaryButton: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  primaryButton: { backgroundColor: theme.primary, paddingVertical: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  primaryButtonText: { color: theme.text, fontSize: 16, fontWeight: 'bold' },
 });

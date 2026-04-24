@@ -16,8 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Importing reusable services from the repo
-import { COLORS } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 
@@ -25,6 +24,9 @@ export default function StockInScreen() {
     // Mode State
     const [entryMode, setEntryMode] = useState('restock'); // 'restock' or 'expense'
     const [userName, setUserName] = useState('');
+
+    const { theme } = useTheme();
+    const styles = getStyles(theme);
 
     // Form State
     const [selectedItem, setSelectedItem] = useState(null); // Used for restock
@@ -68,10 +70,7 @@ export default function StockInScreen() {
         return () => unsubscribe();
     }, []);
 
-
-    //--------------------------------------
-    // FETCH INVENTORY (From Local Storage)
-    //--------------------------------------
+    // Getting the stored inventory
     const fetchInventory = async () => {
         setIsFetchingItems(true);
         try {
@@ -216,10 +215,10 @@ export default function StockInScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
             <View style={styles.headerRow}>
                 <Text style={styles.headerTitle}>Stock In / Expense</Text>
-                <View style={[styles.networkBadge, { backgroundColor: isOnline ? COLORS.primary : '#FF3B30' }]}>
+                <View style={[styles.networkBadge, { backgroundColor: isOnline ? theme.primary : '#FF3B30' }]}>
                     <Text style={styles.networkText}>{isOnline ? 'Online' : 'Offline'}</Text>
                 </View>
             </View>
@@ -250,7 +249,7 @@ export default function StockInScreen() {
                             <Text style={selectedItem ? styles.selectorText : styles.placeholderText}>
                                 {selectedItem ? `${selectedItem.itemName} (${selectedItem.itemId})` : "Tap to select an item..."}
                             </Text>
-                            <Ionicons name="chevron-down" size={20} color={COLORS.textMuted} />
+                            <Ionicons name="chevron-down" size={20} color={theme.textMuted} />
                         </TouchableOpacity>
                         {selectedItem && (
                             <Text style={styles.stockHint}>Current Stock: {selectedItem.openingStock}</Text>
@@ -262,7 +261,7 @@ export default function StockInScreen() {
                         <TextInput
                             style={styles.input}
                             placeholder="e.g. Printer Ink, Screws"
-                            placeholderTextColor={COLORS.textMuted}
+                            placeholderTextColor={theme.textMuted}
                             value={itemName}
                             onChangeText={setItemName}
                         />
@@ -276,7 +275,7 @@ export default function StockInScreen() {
                         <TextInput
                             style={styles.input}
                             placeholder="0.00"
-                            placeholderTextColor={COLORS.textMuted}
+                            placeholderTextColor={theme.textMuted}
                             keyboardType="numeric"
                             value={price}
                             onChangeText={setPrice}
@@ -287,7 +286,7 @@ export default function StockInScreen() {
                         <TextInput
                             style={styles.input}
                             placeholder="0"
-                            placeholderTextColor={COLORS.textMuted}
+                            placeholderTextColor={theme.textMuted}
                             keyboardType="numeric"
                             value={quantity}
                             onChangeText={setQuantity}
@@ -303,7 +302,7 @@ export default function StockInScreen() {
                             <Image source={{ uri: invoiceImage }} style={styles.imagePreview} />
                         ) : (
                             <View style={styles.imagePlaceholder}>
-                                <Ionicons name="camera-outline" size={32} color={COLORS.textMuted} />
+                                <Ionicons name="camera-outline" size={32} color={theme.textMuted} />
                                 <Text style={styles.imagePlaceholderText}>Tap to attach invoice</Text>
                             </View>
                         )}
@@ -316,7 +315,7 @@ export default function StockInScreen() {
                     <TextInput
                         style={[styles.input, styles.textArea]}
                         placeholder="Supplier name, reason for expense..."
-                        placeholderTextColor={COLORS.textMuted}
+                        placeholderTextColor={theme.textMuted}
                         multiline={true}
                         numberOfLines={3}
                         value={remarks}
@@ -345,20 +344,20 @@ export default function StockInScreen() {
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Inventory Catalog</Text>
                             <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-                                <Ionicons name="close" size={28} color={COLORS.text} />
+                                <Ionicons name="close" size={28} color={theme.text} />
                             </TouchableOpacity>
                         </View>
 
                         <TextInput
                             style={styles.searchInput}
                             placeholder="Search by name or ID..."
-                            placeholderTextColor={COLORS.textMuted}
+                            placeholderTextColor={theme.textMuted}
                             value={searchQuery}
                             onChangeText={handleSearch}
                         />
 
                         {isFetchingItems ? (
-                            <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 20 }} />
+                            <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 20 }} />
                         ) : (
                             <FlatList
                                 data={filteredList}
@@ -374,7 +373,7 @@ export default function StockInScreen() {
                                         <Text style={styles.modalItemName}>{item.itemName}</Text>
                                         <View style={{ flexDirection: 'row', marginTop: 4, alignItems: 'center', justifyContent: 'space-between' }}>
                                         <Text style={styles.modalItemSub}>{item.category} • {item.location} • {item.rack}</Text> 
-                                        <Text style={{color: item.openingStock < item.minStock ? COLORS.danger : COLORS.primary}}>Stock Available: {item.openingStock}</Text>
+                                        <Text style={{color: item.openingStock < item.minStock ? theme.danger : theme.primary}}>Stock Available: {item.openingStock}</Text>
                                         </View>
                                     </TouchableOpacity>
                                 )}
@@ -388,49 +387,49 @@ export default function StockInScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
+const getStyles = (theme) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
     headerRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 10, alignItems: 'center' },
-    headerTitle: { color: COLORS.text, fontSize: 24, fontWeight: 'bold' },
+    headerTitle: { color: theme.text, fontSize: 24, fontWeight: 'bold' },
     networkBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
     networkText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
 
-    toggleContainer: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: COLORS.card, borderRadius: 12, padding: 4, marginBottom: 10 },
+    toggleContainer: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: theme.card, borderRadius: 12, padding: 4, marginBottom: 10 },
     toggleButton: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-    toggleActive: { backgroundColor: COLORS.primary },
-    toggleText: { color: COLORS.textMuted, fontWeight: 'bold' },
+    toggleActive: { backgroundColor: theme.primary },
+    toggleText: { color: theme.textMuted, fontWeight: 'bold' },
     toggleTextActive: { color: '#fff' },
 
     scrollContent: { padding: 20, paddingTop: 0 },
     inputGroup: { marginBottom: 16 },
     row: { flexDirection: 'row', justifyContent: 'space-between' },
-    inputLabel: { color: COLORS.text, fontSize: 14, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
+    inputLabel: { color: theme.text, fontSize: 14, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
 
-    input: { backgroundColor: COLORS.inputBg, color: COLORS.text, borderRadius: 12, paddingHorizontal: 16, height: 50, fontSize: 15 },
+    input: { backgroundColor: theme.inputBg, color: theme.text, borderRadius: 12, paddingHorizontal: 16, height: 50, fontSize: 15 },
     textArea: { height: 80, paddingTop: 12, textAlignVertical: 'top' },
 
-    selectorBox: { backgroundColor: COLORS.inputBg, borderRadius: 12, paddingHorizontal: 16, height: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    selectorText: { color: COLORS.text, fontSize: 15 },
-    placeholderText: { color: COLORS.textMuted, fontSize: 15 },
-    stockHint: { color: COLORS.primary, fontSize: 12, marginTop: 4, marginLeft: 4, fontWeight: '500' },
+    selectorBox: { backgroundColor: theme.inputBg, borderRadius: 12, paddingHorizontal: 16, height: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    selectorText: { color: theme.text, fontSize: 15 },
+    placeholderText: { color: theme.textMuted, fontSize: 15 },
+    stockHint: { color: theme.primary, fontSize: 12, marginTop: 4, marginLeft: 4, fontWeight: '500' },
 
-    imagePicker: { backgroundColor: COLORS.inputBg, borderRadius: 12, height: 130, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.card, borderStyle: 'dashed' },
+    imagePicker: { backgroundColor: theme.inputBg, borderRadius: 12, height: 130, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: theme.card, borderStyle: 'dashed' },
     imagePreview: { width: '100%', height: '100%', resizeMode: 'cover' },
     imagePlaceholder: { alignItems: 'center' },
-    imagePlaceholderText: { color: COLORS.textMuted, marginTop: 8, fontSize: 14 },
+    imagePlaceholderText: { color: theme.textMuted, marginTop: 8, fontSize: 14 },
 
-    submitButton: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 10, marginBottom: 30 },
+    submitButton: { backgroundColor: theme.primary, paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 10, marginBottom: 30 },
     submitButtonDisabled: { opacity: 0.7 },
     submitButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 
     // Modal Styles
     modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-    modalContent: { backgroundColor: COLORS.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '80%', padding: 20 },
+    modalContent: { backgroundColor: theme.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '80%', padding: 20 },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-    modalTitle: { color: COLORS.text, fontSize: 20, fontWeight: 'bold' },
-    searchInput: { backgroundColor: COLORS.inputBg, color: COLORS.text, borderRadius: 10, paddingHorizontal: 15, height: 45, marginBottom: 15 },
-    modalItem: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: COLORS.card },
-    modalItemName: { color: COLORS.text, fontSize: 16, fontWeight: '500' },
-    modalItemSub: { color: COLORS.textMuted, fontSize: 13, marginTop: 4 },
-    emptyText: { color: COLORS.textMuted, textAlign: 'center', marginTop: 30 }
+    modalTitle: { color: theme.text, fontSize: 20, fontWeight: 'bold' },
+    searchInput: { backgroundColor: theme.inputBg, color: theme.text, borderRadius: 10, paddingHorizontal: 15, height: 45, marginBottom: 15 },
+    modalItem: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: theme.card },
+    modalItemName: { color: theme.text, fontSize: 16, fontWeight: '500' },
+    modalItemSub: { color: theme.textMuted, fontSize: 13, marginTop: 4 },
+    emptyText: { color: theme.textMuted, textAlign: 'center', marginTop: 30 }
 });

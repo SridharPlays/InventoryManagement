@@ -1,22 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import {
-	ActivityIndicator,
-	Alert,
-	FlatList,
-	Image,
-	KeyboardAvoidingView,
-	Platform,
-	ScrollView,
-	StyleSheet,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { COLORS } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 
@@ -24,6 +24,9 @@ export default function QuickTakeoutScreen({ navigation }) {
   const [items, setItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [userData, setUserData] = useState(null);
+
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
 
   // Cart State
   const [cart, setCart] = useState([]);
@@ -138,7 +141,7 @@ export default function QuickTakeoutScreen({ navigation }) {
         </View>
         <View style={styles.itemContent}>
           <Text style={styles.itemName} numberOfLines={1}>{item.itemName}</Text>
-          <Text style={styles.itemSub}>{item.itemId} • {item.openingStock} {item.unit} available</Text>
+          <Text style={styles.itemSub}>{item.location} • {item.rack} | {item.openingStock} {item.unit} available</Text>
         </View>
         
         {/* Add / Adjust Cart Quantity Controls */}
@@ -146,16 +149,16 @@ export default function QuickTakeoutScreen({ navigation }) {
           {cartQty > 0 ? (
             <View style={styles.qtyContainer}>
               <TouchableOpacity onPress={() => handleUpdateCart(item, -1)} style={styles.qtyBtn}>
-                <Ionicons name="remove" size={16} color={COLORS.text} />
+                <Ionicons name="remove" size={16} color={theme.text} />
               </TouchableOpacity>
               <Text style={styles.qtyText}>{cartQty}</Text>
               <TouchableOpacity onPress={() => handleUpdateCart(item, 1)} style={styles.qtyBtn}>
-                <Ionicons name="add" size={16} color={COLORS.text} />
+                <Ionicons name="add" size={16} color={theme.text} />
               </TouchableOpacity>
             </View>
           ) : (
             <TouchableOpacity 
-              style={[styles.addButton, isOutOfStock && { backgroundColor: COLORS.border }]} 
+              style={[styles.addButton, isOutOfStock && { backgroundColor: theme.border }]} 
               onPress={() => handleUpdateCart(item, 1)}
               disabled={isOutOfStock}
             >
@@ -168,10 +171,10 @@ export default function QuickTakeoutScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => step === 2 ? setStep(1) : navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{step === 1 ? 'Quick Takeout' : 'Cart Summary'}</Text>
         <View style={{ width: 24 }} />
@@ -182,11 +185,11 @@ export default function QuickTakeoutScreen({ navigation }) {
         <View style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 16 }}>
             <View style={styles.searchContainer}>
-              <Ionicons name="search" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
+              <Ionicons name="search" size={20} color={theme.textMuted} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search by name or ID..."
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={theme.textMuted}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
@@ -235,7 +238,7 @@ export default function QuickTakeoutScreen({ navigation }) {
               <TextInput
                 style={[styles.input, styles.textArea]}
                 placeholder="Why do you need this immediately?"
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={theme.textMuted}
                 multiline={true}
                 numberOfLines={4}
                 value={reason}
@@ -263,51 +266,51 @@ export default function QuickTakeoutScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const getStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
-  headerTitle: { color: COLORS.text, fontSize: 20, fontWeight: 'bold' },
+  headerTitle: { color: theme.text, fontSize: 20, fontWeight: 'bold' },
 
   // Search & List Styles
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderRadius: 12, paddingHorizontal: 12, marginBottom: 16 },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 12, paddingHorizontal: 12, marginBottom: 16 },
   searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, color: COLORS.text, height: 48, fontSize: 15 },
-  emptyText: { color: COLORS.textMuted, textAlign: 'center', marginTop: 40 },
+  searchInput: { flex: 1, color: theme.text, height: 48, fontSize: 15 },
+  emptyText: { color: theme.textMuted, textAlign: 'center', marginTop: 40 },
 
-  itemCard: { flexDirection: 'row', backgroundColor: COLORS.card, padding: 12, borderRadius: 12, marginBottom: 12, alignItems: 'center' },
-  iconPlaceholder: { width: 50, height: 50, borderRadius: 8, backgroundColor: COLORS.inputBg, marginRight: 12 },
+  itemCard: { flexDirection: 'row', backgroundColor: theme.card, padding: 12, borderRadius: 12, marginBottom: 12, alignItems: 'center' },
+  iconPlaceholder: { width: 50, height: 50, borderRadius: 8, backgroundColor: theme.inputBg, marginRight: 12 },
   itemContent: { flex: 1 },
-  itemName: { color: COLORS.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-  itemSub: { color: COLORS.textMuted, fontSize: 13 },
+  itemName: { color: theme.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
+  itemSub: { color: theme.textMuted, fontSize: 13 },
   itemTrailing: { alignItems: 'flex-end', justifyContent: 'center' },
 
   // Cart Controls
-  addButton: { backgroundColor: COLORS.primary + '30', paddingVertical: 6, paddingHorizontal: 16, borderRadius: 8 },
-  addButtonText: { color: COLORS.primary, fontWeight: 'bold', fontSize: 13 },
-  qtyContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderRadius: 8, paddingHorizontal: 4, paddingVertical: 4 },
-  qtyBtn: { padding: 4, backgroundColor: COLORS.border, borderRadius: 6 },
-  qtyText: { color: COLORS.text, marginHorizontal: 12, fontWeight: 'bold', fontSize: 16 },
+  addButton: { backgroundColor: theme.primary + '30', paddingVertical: 6, paddingHorizontal: 16, borderRadius: 8 },
+  addButtonText: { color: theme.primary, fontWeight: 'bold', fontSize: 13 },
+  qtyContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 8, paddingHorizontal: 4, paddingVertical: 4 },
+  qtyBtn: { padding: 4, backgroundColor: theme.border, borderRadius: 6 },
+  qtyText: { color: theme.text, marginHorizontal: 12, fontWeight: 'bold', fontSize: 16 },
 
   // Floating Cart
-  floatingCartContainer: { position: 'absolute', bottom: 20, left: 16, right: 16, backgroundColor: COLORS.primary, borderRadius: 16, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4 },
+  floatingCartContainer: { position: 'absolute', bottom: 20, left: 16, right: 16, backgroundColor: theme.primary, borderRadius: 16, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4 },
   cartTotalText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   cartSubText: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 },
   checkoutBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
   checkoutBtnText: { color: '#fff', fontWeight: 'bold', marginRight: 6 },
 
   // Checkout Styles
-  sectionTitle: { color: COLORS.textMuted, fontSize: 14, textTransform: 'uppercase', marginBottom: 12, fontWeight: '600' },
-  cartItemRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: COLORS.card, padding: 16, borderRadius: 12, marginBottom: 8 },
-  cartItemName: { color: COLORS.text, fontSize: 15, fontWeight: '500', flex: 1, paddingRight: 10 },
-  cartItemQty: { color: COLORS.primary, fontSize: 15, fontWeight: 'bold' },
-  divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 24 },
+  sectionTitle: { color: theme.textMuted, fontSize: 14, textTransform: 'uppercase', marginBottom: 12, fontWeight: '600' },
+  cartItemRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: theme.card, padding: 16, borderRadius: 12, marginBottom: 8 },
+  cartItemName: { color: theme.text, fontSize: 15, fontWeight: '500', flex: 1, paddingRight: 10 },
+  cartItemQty: { color: theme.primary, fontSize: 15, fontWeight: 'bold' },
+  divider: { height: 1, backgroundColor: theme.border, marginVertical: 24 },
   
   inputGroup: { marginBottom: 16 },
-  inputLabel: { color: COLORS.text, fontSize: 14, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
-  input: { backgroundColor: COLORS.inputBg, color: COLORS.text, borderRadius: 12, paddingHorizontal: 16, height: 52, fontSize: 15 },
+  inputLabel: { color: theme.text, fontSize: 14, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
+  input: { backgroundColor: theme.inputBg, color: theme.text, borderRadius: 12, paddingHorizontal: 16, height: 52, fontSize: 15 },
   textArea: { height: 100, paddingTop: 14, textAlignVertical: 'top' },
-  helperText: { color: COLORS.warning, fontSize: 12, marginTop: 8, marginLeft: 4, fontStyle: 'italic' },
+  helperText: { color: theme.warning, fontSize: 12, marginTop: 8, marginLeft: 4, fontStyle: 'italic' },
 
-  primaryButton: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  primaryButton: { backgroundColor: theme.primary, paddingVertical: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });

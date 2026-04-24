@@ -13,7 +13,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import { fetchFromGAS, postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 
@@ -22,6 +22,9 @@ export default function RequestItemScreen({ navigation }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [inventory, setInventory] = useState([]);
   const [userName, setUserName] = useState("Team Lead");
+
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
 
   // Filtering & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -81,7 +84,7 @@ export default function RequestItemScreen({ navigation }) {
       console.error("Error loading data:", error);
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false); // Make sure to stop the refresh spinner
+      setIsRefreshing(false);
     }
   };
 
@@ -98,13 +101,17 @@ export default function RequestItemScreen({ navigation }) {
 
       const updatedCart = { ...prev };
 
+      if (newQty > item.minStock) {
+
+      }
+
       if (newQty <= 0) {
-        delete updatedCart[item.itemId]; // Remove if qty drops to 0
+        delete updatedCart[item.itemId];
       } else {
         updatedCart[item.itemId] = { ...item, requestQty: newQty };
       }
 
-      // Save to local storage whenever it changes
+      // Save to local storage
       StorageService.cacheData('requestCart', updatedCart);
       return updatedCart;
     });
@@ -186,6 +193,7 @@ export default function RequestItemScreen({ navigation }) {
   const renderItemCard = ({ item }) => {
     const cartQty = cart[item.itemId]?.requestQty || 0;
     const image = item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/caps_logo.png');
+    const isDisabled = false;
 
     return (
       <View style={styles.itemCard}>
@@ -204,16 +212,16 @@ export default function RequestItemScreen({ navigation }) {
           {cartQty > 0 ? (
             <>
               <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, -1)}>
-                <Ionicons name="remove" size={18} color={COLORS.text} />
+                <Ionicons name="remove" size={18} color={theme.text} />
               </TouchableOpacity>
               <Text style={styles.qtyText}>{cartQty}</Text>
               <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, 1)}>
-                <Ionicons name="add" size={18} color={COLORS.text} />
+                <Ionicons name="add" size={18} color={theme.text} />
               </TouchableOpacity>
             </>
           ) : (
             <TouchableOpacity style={styles.addBtn} onPress={() => updateQuantity(item, 1)}>
-              <Ionicons name="add" size={18} color={COLORS.primary} />
+              <Ionicons name="add" size={18} color={theme.primary} />
               <Text style={styles.addBtnText}>Add</Text>
             </TouchableOpacity>
           )}
@@ -223,12 +231,9 @@ export default function RequestItemScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-        </TouchableOpacity>
         <View>
           <Text style={styles.headerTitle}>Bulk Request</Text>
           <Text style={styles.headerSub}>Request items for {userName}</Text>
@@ -238,11 +243,11 @@ export default function RequestItemScreen({ navigation }) {
       {/* Search & Categories */}
       <View style={styles.filterSection}>
         <View style={styles.searchBox}>
-          <Ionicons name="search" size={20} color={COLORS.textMuted} />
+          <Ionicons name="search" size={20} color={theme.textMuted} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search items by name or ID..."
-            placeholderTextColor={COLORS.textMuted}
+            placeholderTextColor={theme.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -271,7 +276,7 @@ export default function RequestItemScreen({ navigation }) {
 
       {/* Item List */}
       {isLoading ? (
-        <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
           data={filteredInventory}
@@ -308,14 +313,14 @@ export default function RequestItemScreen({ navigation }) {
               {/* CLEAR ALL BUTTON */}
               {cartItemCount > 0 && (
                 <TouchableOpacity onPress={confirmClearCart}>
-                  <Text style={{ color: COLORS.danger, fontWeight: '600', fontSize: 14 }}>
+                  <Text style={{ color: theme.danger, fontWeight: '600', fontSize: 14 }}>
                     Clear All
                   </Text>
                 </TouchableOpacity>
               )}
 
               <TouchableOpacity style={styles.closeButton} onPress={() => setCartModalVisible(false)}>
-                <Ionicons name="close" size={24} color={COLORS.textMuted} />
+                <Ionicons name="close" size={24} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
           </View>
@@ -332,11 +337,11 @@ export default function RequestItemScreen({ navigation }) {
                 </View>
                 <View style={styles.qtyContainer}>
                   <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, -1)}>
-                    <Ionicons name="remove" size={18} color={COLORS.text} />
+                    <Ionicons name="remove" size={18} color={theme.text} />
                   </TouchableOpacity>
                   <Text style={styles.qtyText}>{item.requestQty}</Text>
                   <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, 1)}>
-                    <Ionicons name="add" size={18} color={COLORS.text} />
+                    <Ionicons name="add" size={18} color={theme.text} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -349,7 +354,7 @@ export default function RequestItemScreen({ navigation }) {
         </SafeAreaView>
         <View style={styles.modalFooter}>
           {isSubmitting ? (
-            <ActivityIndicator size="large" color={COLORS.primary} />
+            <ActivityIndicator size="large" color={theme.primary} />
           ) : (
             <TouchableOpacity
               style={[styles.submitBtn, cartItemCount === 0 && { opacity: 0.5 }]}
@@ -367,58 +372,58 @@ export default function RequestItemScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const getStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
   header: { flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 10 },
-  backBtn: { marginRight: 16, backgroundColor: COLORS.card, padding: 8, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border },
-  headerTitle: { color: COLORS.text, fontSize: 24, fontWeight: 'bold' },
-  headerSub: { color: COLORS.textMuted, fontSize: 13, marginTop: 2 },
+  backBtn: { marginRight: 16, backgroundColor: theme.card, padding: 8, borderRadius: 12, borderWidth: 1, borderColor: theme.border },
+  headerTitle: { color: theme.text, fontSize: 24, fontWeight: 'bold' },
+  headerSub: { color: theme.textMuted, fontSize: 13, marginTop: 2 },
 
   // Search & Filter
-  filterSection: { borderBottomWidth: 1, borderBottomColor: COLORS.border, paddingBottom: 16 },
-  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, marginHorizontal: 16, paddingHorizontal: 16, height: 48, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: 16 },
-  searchInput: { flex: 1, color: COLORS.text, marginLeft: 10, fontSize: 15 },
+  filterSection: { borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: 16 },
+  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, marginHorizontal: 16, paddingHorizontal: 16, height: 48, borderRadius: 12, borderWidth: 1, borderColor: theme.border, marginBottom: 16 },
+  searchInput: { flex: 1, color: theme.text, marginLeft: 10, fontSize: 15 },
   categoryWrapper: { height: 36 },
-  categoryChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: COLORS.inputBg, borderWidth: 1, borderColor: COLORS.border },
-  categoryChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  categoryChipText: { color: COLORS.textMuted, fontWeight: '600', fontSize: 13 },
+  categoryChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: theme.inputBg, borderWidth: 1, borderColor: theme.border },
+  categoryChipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+  categoryChipText: { color: theme.textMuted, fontWeight: '600', fontSize: 13 },
   categoryChipTextActive: { color: '#FFF' },
 
   // List
   listContent: { padding: 16, paddingBottom: 100 },
-  itemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card, padding: 12, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
-  itemImage: { width: 70, height: 70, borderRadius: 12, backgroundColor: COLORS.inputBg },
+  itemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.card, padding: 12, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: theme.border },
+  itemImage: { width: 70, height: 70, borderRadius: 12, backgroundColor: theme.inputBg },
   itemDetails: { flex: 1, marginLeft: 12 },
-  itemName: { color: COLORS.text, fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  itemSub: { color: COLORS.textMuted, fontSize: 12, marginBottom: 4 },
-  itemStock: { color: COLORS.success, fontSize: 12, fontWeight: '600' },
+  itemName: { color: theme.text, fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  itemSub: { color: theme.textMuted, fontSize: 12, marginBottom: 4 },
+  itemStock: { color: theme.success, fontSize: 12, fontWeight: '600' },
 
   // Qty Controls
-  qtyContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border },
+  qtyContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 8, borderWidth: 1, borderColor: theme.border },
   qtyBtn: { padding: 8, paddingHorizontal: 12 },
-  qtyText: { color: COLORS.text, fontWeight: 'bold', fontSize: 16, minWidth: 20, textAlign: 'center' },
-  addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary + '15', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, borderColor: COLORS.primary + '50' },
-  addBtnText: { color: COLORS.primary, fontWeight: 'bold', marginLeft: 4 },
+  qtyText: { color: theme.text, fontWeight: 'bold', fontSize: 16, minWidth: 20, textAlign: 'center' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.primary + '15', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, borderColor: theme.primary + '50' },
+  addBtnText: { color: theme.primary, fontWeight: 'bold', marginLeft: 4 },
 
   // Floating Cart
   floatingCartContainer: { position: 'absolute', bottom: 20, left: 16, right: 16 },
-  floatingCartBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, padding: 16, borderRadius: 16, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
+  floatingCartBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.primary, padding: 16, borderRadius: 16, shadowColor: theme.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
   cartIconWrapper: { position: 'relative', marginRight: 12 },
-  cartBadge: { position: 'absolute', top: -6, right: -10, backgroundColor: COLORS.danger, width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: COLORS.primary },
+  cartBadge: { position: 'absolute', top: -6, right: -10, backgroundColor: theme.danger, width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: theme.primary },
   cartBadgeText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
   floatingCartText: { flex: 1, color: '#FFF', fontSize: 16, fontWeight: 'bold' },
 
   // Modal (Cart Review)
-  modalContainer: { flex: 1, backgroundColor: COLORS.background },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: COLORS.border, backgroundColor: COLORS.card },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.text },
-  closeButton: { padding: 4, backgroundColor: COLORS.inputBg, borderRadius: 20 },
+  modalContainer: { flex: 1, backgroundColor: theme.background },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: theme.border, backgroundColor: theme.card },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: theme.text },
+  closeButton: { padding: 4, backgroundColor: theme.inputBg, borderRadius: 20 },
   cartList: { padding: 16 },
-  emptyCartText: { color: COLORS.textMuted, textAlign: 'center', marginTop: 40, fontSize: 16 },
-  cartItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card, padding: 16, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
-  cartItemName: { color: COLORS.text, fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
-  cartItemSub: { color: COLORS.textMuted, fontSize: 13 },
-  modalFooter: { padding: 20, backgroundColor: COLORS.card, borderTopWidth: 1, borderTopColor: COLORS.border },
-  submitBtn: { flexDirection: 'row', backgroundColor: COLORS.success, padding: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  emptyCartText: { color: theme.textMuted, textAlign: 'center', marginTop: 40, fontSize: 16 },
+  cartItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.card, padding: 16, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: theme.border },
+  cartItemName: { color: theme.text, fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  cartItemSub: { color: theme.textMuted, fontSize: 13 },
+  modalFooter: { padding: 20, backgroundColor: theme.card, borderTopWidth: 1, borderTopColor: theme.border },
+  submitBtn: { flexDirection: 'row', backgroundColor: theme.success, padding: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   submitBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' }
 });

@@ -2,15 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -25,8 +25,9 @@ import * as AuthSession from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 
-import { COLORS } from '../constants/theme';
 import { postToGAS } from '../services/api';
+
+import { useTheme } from '../context/ThemeContext';
 
 // Required to handle the redirect back to the app from the browser
 WebBrowser.maybeCompleteAuthSession();
@@ -44,6 +45,9 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setPasswordVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
 
   const [request, googleResponse, promptAsync] = Google.useAuthRequest({
     iosClientId: '695463828535-ph4hvso1hi5s38kp9sgeieiq22atshmn.apps.googleusercontent.com',
@@ -65,7 +69,7 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
         name: 'default',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: COLORS.primary,
+        lightColor: theme.primary,
       });
     }
 
@@ -162,7 +166,7 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.scrollContent} scrollEnabled={true}>
         <View style={styles.headerCentered}>
           <Image
@@ -178,7 +182,7 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
           <TextInput
             style={styles.input}
             placeholder="sridhar@christuniversity.in"
-            placeholderTextColor={COLORS.textMuted}
+            placeholderTextColor={theme.textMuted}
             keyboardType="email-address"
             autoCapitalize="none"
             value={email}
@@ -193,7 +197,7 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
             <TextInput
               style={styles.inputPassword}
               placeholder="••••••••••"
-              placeholderTextColor={COLORS.textMuted}
+              placeholderTextColor={theme.textMuted}
               secureTextEntry={!isPasswordVisible}
               value={password}
               onChangeText={setPassword}
@@ -203,7 +207,7 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
               <Ionicons
                 name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
                 size={20}
-                color={COLORS.textMuted}
+                color={theme.textMuted}
               />
             </TouchableOpacity>
           </View>
@@ -215,7 +219,7 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
           disabled={isLoading}
         >
           {isLoading ? (
-            <ActivityIndicator color={COLORS.text} />
+            <ActivityIndicator color={theme.text} />
           ) : (
             <Text style={styles.primaryButtonText}>Sign In</Text>
           )}
@@ -223,7 +227,7 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
 
         <View style={styles.rowBetween}>
           <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
-            <Text style={[styles.textSmall, { color: COLORS.primary }]}>Forgot password?</Text>
+            <Text style={[styles.textSmall, { color: theme.primary }]}>Forgot password?</Text>
           </TouchableOpacity>
         </View>
 
@@ -250,7 +254,7 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
           style={styles.socialButton}
           onPress={() => Alert.alert("Apple Sign-In", "Apple Sign-In configuration required.")}
         >
-          <Ionicons name="logo-apple" size={20} color={COLORS.text} style={{ marginRight: 10 }} />
+          <Ionicons name="logo-apple" size={20} color={theme.text} style={{ marginRight: 10 }} />
           <Text style={styles.socialButtonText}>Continue with Apple</Text>
         </TouchableOpacity>
 
@@ -262,25 +266,25 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const getStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
   scrollContent: { padding: 24, paddingTop: 40 },
   headerCentered: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 40 },
-  title: { color: COLORS.text, fontSize: 24, fontWeight: '700', textAlign: 'center' },
+  title: { color: theme.text, fontSize: 24, fontWeight: '700', textAlign: 'center' },
   inputContainer: { marginBottom: 20 },
-  inputLabel: { color: COLORS.text, fontSize: 13, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
-  input: { backgroundColor: COLORS.inputBg, color: COLORS.text, padding: 16, borderRadius: 12, fontSize: 15 },
-  passwordWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderRadius: 12, paddingRight: 16 },
-  inputPassword: { flex: 1, color: COLORS.text, padding: 16, fontSize: 15 },
-  primaryButton: { backgroundColor: COLORS.primary, width: '100%', paddingVertical: 16, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', height: 56 },
-  primaryButtonText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
+  inputLabel: { color: theme.text, fontSize: 13, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
+  input: { backgroundColor: theme.inputBg, color: theme.text, padding: 16, borderRadius: 12, fontSize: 15 },
+  passwordWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 12, paddingRight: 16 },
+  inputPassword: { flex: 1, color: theme.text, padding: 16, fontSize: 15 },
+  primaryButton: { backgroundColor: theme.primary, width: '100%', paddingVertical: 16, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', height: 56 },
+  primaryButtonText: { color: theme.background, fontSize: 16, fontWeight: '600' },
   rowBetween: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 20, marginBottom: 30 },
-  textSmall: { color: COLORS.textMuted, fontSize: 13 },
+  textSmall: { color: theme.textMuted, fontSize: 13 },
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 30 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
-  dividerText: { color: COLORS.textMuted, paddingHorizontal: 15, fontSize: 12 },
-  socialButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.card, padding: 16, borderRadius: 12, marginBottom: 16 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: theme.border },
+  dividerText: { color: theme.textMuted, paddingHorizontal: 15, fontSize: 12 },
+  socialButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.card, padding: 16, borderRadius: 12, marginBottom: 16 },
   socialIcon: { width: 20, height: 20, marginRight: 10 },
-  socialButtonText: { color: COLORS.text, fontSize: 14, fontWeight: '500' },
+  socialButtonText: { color: theme.text, fontSize: 14, fontWeight: '500' },
   signUpRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 20, marginBottom: 40 },
 });

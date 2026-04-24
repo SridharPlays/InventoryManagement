@@ -1,24 +1,24 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  LayoutAnimation,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  UIManager,
-  View
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    LayoutAnimation,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    UIManager,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS } from '../constants/theme';
-import { postToGAS, fetchFromGAS } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
+import { fetchFromGAS, postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 
 // Enable LayoutAnimation for Android
@@ -28,6 +28,9 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 const RackSection = ({ rackName, items, isAdmin, cart, updateQuantity }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
 
   const toggleExpand = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -42,13 +45,13 @@ const RackSection = ({ rackName, items, isAdmin, cart, updateQuantity }) => {
         activeOpacity={0.7}
       >
         <View style={styles.rackHeaderLeft}>
-          <Ionicons name="layers-outline" size={20} color={COLORS.primary} style={{ marginRight: 8 }} />
+          <Ionicons name="layers-outline" size={20} color={theme.primary} style={{ marginRight: 8 }} />
           <Text style={styles.rackTitle}>{rackName}</Text>
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{items.length}</Text>
           </View>
         </View>
-        <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={COLORS.textMuted} />
+        <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={theme.textMuted} />
       </TouchableOpacity>
 
       {isExpanded && (
@@ -79,16 +82,16 @@ const RackSection = ({ rackName, items, isAdmin, cart, updateQuantity }) => {
                       {cartQty > 0 ? (
                         <>
                           <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, -1)}>
-                            <Ionicons name="remove" size={18} color={COLORS.text} />
+                            <Ionicons name="remove" size={18} color={theme.text} />
                           </TouchableOpacity>
                           <Text style={styles.qtyText}>{cartQty}</Text>
                           <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, 1)}>
-                            <Ionicons name="add" size={18} color={COLORS.text} />
+                            <Ionicons name="add" size={18} color={theme.text} />
                           </TouchableOpacity>
                         </>
                       ) : (
                         <TouchableOpacity style={styles.addBtn} onPress={() => updateQuantity(item, 1)}>
-                          <Ionicons name="add" size={18} color={COLORS.primary} />
+                          <Ionicons name="add" size={18} color={theme.primary} />
                           <Text style={styles.addBtnText}>Add</Text>
                         </TouchableOpacity>
                       )}
@@ -108,6 +111,9 @@ export default function CupboardScreen({ route, navigation }) {
   const { cupboardId, floorId, isAdmin = false } = route.params;
   const [groupedItems, setGroupedItems] = useState([]);
   const [userName, setUserName] = useState("Team Lead");
+
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
 
   // Cart State
   const [cart, setCart] = useState({});
@@ -260,10 +266,10 @@ export default function CupboardScreen({ route, navigation }) {
   const cartItemCount = Object.keys(cart).length;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
         <View>
           <Text style={styles.headerTitle}>Floor {floorId} - Cupboard {cupboardId}</Text>
@@ -313,14 +319,14 @@ export default function CupboardScreen({ route, navigation }) {
               {/* CLEAR ALL BUTTON */}
               {cartItemCount > 0 && (
                 <TouchableOpacity onPress={confirmClearCart}>
-                  <Text style={{ color: COLORS.danger, fontWeight: '600', fontSize: 14 }}>
+                  <Text style={{ color: theme.danger, fontWeight: '600', fontSize: 14 }}>
                     Clear All
                   </Text>
                 </TouchableOpacity>
               )}
 
               <TouchableOpacity style={styles.closeButton} onPress={() => setCartModalVisible(false)}>
-                <Ionicons name="close" size={24} color={COLORS.textMuted} />
+                <Ionicons name="close" size={24} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
           </View>
@@ -337,11 +343,11 @@ export default function CupboardScreen({ route, navigation }) {
                 </View>
                 <View style={styles.qtyContainer}>
                   <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, -1)}>
-                    <Ionicons name="remove" size={18} color={COLORS.text} />
+                    <Ionicons name="remove" size={18} color={theme.text} />
                   </TouchableOpacity>
                   <Text style={styles.qtyText}>{item.requestQty}</Text>
                   <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, 1)}>
-                    <Ionicons name="add" size={18} color={COLORS.text} />
+                    <Ionicons name="add" size={18} color={theme.text} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -353,7 +359,7 @@ export default function CupboardScreen({ route, navigation }) {
 
           <View style={styles.modalFooter}>
             {isSubmitting ? (
-              <ActivityIndicator size="large" color={COLORS.primary} />
+              <ActivityIndicator size="large" color={theme.primary} />
             ) : (
               <TouchableOpacity
                 style={[styles.submitBtn, cartItemCount === 0 && { opacity: 0.5 }]}
@@ -372,57 +378,57 @@ export default function CupboardScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const getStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
   headerRow: { flexDirection: 'row', alignItems: 'center', padding: 20, gap: 16 },
-  headerTitle: { color: COLORS.text, fontSize: 20, fontWeight: 'bold' },
-  headerSub: { color: COLORS.textMuted, fontSize: 13, marginTop: 2 },
+  headerTitle: { color: theme.text, fontSize: 20, fontWeight: 'bold' },
+  headerSub: { color: theme.textMuted, fontSize: 13, marginTop: 2 },
   content: { paddingHorizontal: 16 },
-  emptyText: { color: COLORS.textMuted, textAlign: 'center', marginTop: 40 },
+  emptyText: { color: theme.textMuted, textAlign: 'center', marginTop: 40 },
 
-  rackContainer: { marginBottom: 12, backgroundColor: COLORS.card, borderRadius: 16, overflow: 'hidden' },
-  rackHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: COLORS.inputBg },
-  rackHeaderExpanded: { borderBottomWidth: 1, borderBottomColor: COLORS.background },
+  rackContainer: { marginBottom: 12, backgroundColor: theme.card, borderRadius: 16, overflow: 'hidden' },
+  rackHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: theme.inputBg },
+  rackHeaderExpanded: { borderBottomWidth: 1, borderBottomColor: theme.background },
   rackHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
-  rackTitle: { color: COLORS.text, fontSize: 16, fontWeight: 'bold', marginRight: 8 },
-  badge: { backgroundColor: COLORS.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  badgeText: { color: COLORS.primary, fontSize: 12, fontWeight: 'bold' },
-  rackContent: { padding: 12, backgroundColor: COLORS.card },
+  rackTitle: { color: theme.text, fontSize: 16, fontWeight: 'bold', marginRight: 8 },
+  badge: { backgroundColor: theme.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  badgeText: { color: theme.primary, fontSize: 12, fontWeight: 'bold' },
+  rackContent: { padding: 12, backgroundColor: theme.card },
 
-  listCard: { flexDirection: 'row', backgroundColor: COLORS.background, padding: 12, borderRadius: 18, marginBottom: 8, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
-  iconPlaceholder: { width: 60, height: 60, borderRadius: 8, backgroundColor: COLORS.inputBg },
+  listCard: { flexDirection: 'row', backgroundColor: theme.background, padding: 12, borderRadius: 18, marginBottom: 8, alignItems: 'center', borderWidth: 1, borderColor: theme.border },
+  iconPlaceholder: { width: 60, height: 60, borderRadius: 8, backgroundColor: theme.inputBg },
   listContent: { flex: 1, marginLeft: 12 },
-  itemName: { color: COLORS.text, fontSize: 15, fontWeight: '600', marginBottom: 2 },
-  itemSub: { color: COLORS.textMuted, fontSize: 12 },
+  itemName: { color: theme.text, fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  itemSub: { color: theme.textMuted, fontSize: 12 },
   listTrailing: { alignItems: 'flex-end', justifyContent: 'center' },
-  stockText: { color: COLORS.success, fontSize: 12, fontWeight: '600', marginBottom: 8 },
+  stockText: { color: theme.success, fontSize: 12, fontWeight: '600', marginBottom: 8 },
 
   // Qty Controls (From RequestItemScreen)
-  qtyContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border },
+  qtyContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 8, borderWidth: 1, borderColor: theme.border },
   qtyBtn: { padding: 6, paddingHorizontal: 10 },
-  qtyText: { color: COLORS.text, fontWeight: 'bold', fontSize: 14, minWidth: 20, textAlign: 'center' },
-  addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary + '15', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: COLORS.primary + '50' },
-  addBtnText: { color: COLORS.primary, fontWeight: 'bold', marginLeft: 4, fontSize: 13 },
+  qtyText: { color: theme.text, fontWeight: 'bold', fontSize: 14, minWidth: 20, textAlign: 'center' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.primary + '15', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: theme.primary + '50' },
+  addBtnText: { color: theme.primary, fontWeight: 'bold', marginLeft: 4, fontSize: 13 },
 
   // Floating Cart (From RequestItemScreen)
   floatingCartContainer: { position: 'absolute', bottom: 20, left: 16, right: 16 },
-  floatingCartBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, padding: 16, borderRadius: 16, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
+  floatingCartBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.primary, padding: 16, borderRadius: 16, shadowColor: theme.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
   cartIconWrapper: { position: 'relative', marginRight: 12 },
-  cartBadge: { position: 'absolute', top: -6, right: -10, backgroundColor: COLORS.danger, width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: COLORS.primary },
+  cartBadge: { position: 'absolute', top: -6, right: -10, backgroundColor: theme.danger, width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: theme.primary },
   cartBadgeText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
   floatingCartText: { flex: 1, color: '#FFF', fontSize: 16, fontWeight: 'bold' },
 
   // Modal
-  modalContainer: { flex: 1, backgroundColor: COLORS.background },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: COLORS.border, backgroundColor: COLORS.card },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.text },
-  closeButton: { padding: 4, backgroundColor: COLORS.inputBg, borderRadius: 20 },
+  modalContainer: { flex: 1, backgroundColor: theme.background },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: theme.border, backgroundColor: theme.card },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: theme.text },
+  closeButton: { padding: 4, backgroundColor: theme.inputBg, borderRadius: 20 },
   cartList: { padding: 16 },
-  emptyCartText: { color: COLORS.textMuted, textAlign: 'center', marginTop: 40, fontSize: 16 },
-  cartItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card, padding: 16, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
-  cartItemName: { color: COLORS.text, fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
-  cartItemSub: { color: COLORS.textMuted, fontSize: 13 },
-  modalFooter: { padding: 20, backgroundColor: COLORS.card, borderTopWidth: 1, borderTopColor: COLORS.border },
-  submitBtn: { flexDirection: 'row', backgroundColor: COLORS.success, padding: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  emptyCartText: { color: theme.textMuted, textAlign: 'center', marginTop: 40, fontSize: 16 },
+  cartItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.card, padding: 16, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: theme.border },
+  cartItemName: { color: theme.text, fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  cartItemSub: { color: theme.textMuted, fontSize: 13 },
+  modalFooter: { padding: 20, backgroundColor: theme.card, borderTopWidth: 1, borderTopColor: theme.border },
+  submitBtn: { flexDirection: 'row', backgroundColor: theme.success, padding: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   submitBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' }
 });

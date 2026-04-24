@@ -1,26 +1,29 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import { fetchFromGAS, postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 
 export default function AlertsScreen({ navigation }) {
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
+
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   // User Data State
   const [userEmail, setUserEmail] = useState('');
   const [emailAlertsEnabled, setEmailAlertsEnabled] = useState(false);
@@ -49,7 +52,7 @@ export default function AlertsScreen({ navigation }) {
       if (sessionData) {
         const parsed = typeof sessionData === 'string' ? JSON.parse(sessionData) : sessionData;
         if (parsed.email) setUserEmail(parsed.email);
-        
+
         if (parsed.emailPreference !== undefined) {
           setEmailAlertsEnabled(parsed.emailPreference === true || String(parsed.emailPreference).toLowerCase() === 'true');
         }
@@ -60,7 +63,7 @@ export default function AlertsScreen({ navigation }) {
 
       const freshDash = await fetchFromGAS('getDashboard');
       if (freshDash) setAlerts(freshDash);
-      
+
     } catch (error) {
       console.error("Error loading alerts:", error);
     } finally {
@@ -78,7 +81,7 @@ export default function AlertsScreen({ navigation }) {
 
   const toggleEmailAlerts = async (newValue) => {
     if (!userEmail) return Alert.alert("Error", "Email not found. Please re-login.");
-    setEmailAlertsEnabled(newValue); 
+    setEmailAlertsEnabled(newValue);
     setIsUpdatingPrefs(true);
     try {
       const response = await postToGAS('updateEmailPreference', { email: userEmail, receiveAlerts: newValue });
@@ -120,7 +123,7 @@ export default function AlertsScreen({ navigation }) {
   const submitApproval = async (rowNumber) => {
     setIsApproving(true);
     try {
-      const response = await postToGAS('approveRequest', { 
+      const response = await postToGAS('approveRequest', {
         rowNumber: rowNumber,
         approvedQty: approveQty,
         remarks: remarks
@@ -143,7 +146,7 @@ export default function AlertsScreen({ navigation }) {
   const submitDecline = async (rowNumber) => {
     setIsDeclining(true);
     try {
-      const response = await postToGAS('declineRequest', { 
+      const response = await postToGAS('declineRequest', {
         rowNumber: rowNumber,
         remarks: remarks
       });
@@ -163,7 +166,7 @@ export default function AlertsScreen({ navigation }) {
   };
 
   const FilterChip = ({ label, active, type }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[styles.filterChip, active && styles.filterChipActive]}
       onPress={() => setFilters(prev => ({ ...prev, [type]: !prev[type] }))}
     >
@@ -188,31 +191,31 @@ export default function AlertsScreen({ navigation }) {
   }, {});
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Alerts Center</Text>
         <Text style={styles.headerSub}>Manage notifications and approvals</Text>
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
       >
         {/* Settings */}
         <View style={styles.preferencesCard}>
           <View style={styles.prefIconBox}>
-            <MaterialCommunityIcons name="email-outline" size={24} color={COLORS.primary} />
+            <MaterialCommunityIcons name="email-outline" size={24} color={theme.primary} />
           </View>
           <View style={styles.prefTextContainer}>
             <Text style={styles.prefTitle}>Email Notifications</Text>
             <Text style={styles.prefSub}>Get alerts for low stock and requests</Text>
           </View>
-          {isUpdatingPrefs ? <ActivityIndicator size="small" color={COLORS.primary} /> : (
+          {isUpdatingPrefs ? <ActivityIndicator size="small" color={theme.primary} /> : (
             <Switch
-              trackColor={{ false: COLORS.border, true: COLORS.primary }}
+              trackColor={{ false: theme.border, true: theme.primary }}
               thumbColor={"#FFF"}
-              ios_backgroundColor={COLORS.border}
+              ios_backgroundColor={theme.border}
               onValueChange={toggleEmailAlerts}
               value={emailAlertsEnabled}
             />
@@ -227,33 +230,33 @@ export default function AlertsScreen({ navigation }) {
         </View>
 
         {isLoading ? (
-          <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
+          <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 40 }} />
         ) : (
           <View style={styles.alertsList}>
-            
+
             {/* 1. REQUESTS ALWAYS ON TOP (Grouped into Single Box per Person) */}
             {filters.requests && Object.entries(groupedRequests).map(([person, items], groupIndex) => (
-              <View key={`req_group_${groupIndex}`} style={[styles.groupedCard, { borderTopColor: COLORS.primary, borderTopWidth: 4 }]}>
-                
+              <View key={`req_group_${groupIndex}`} style={[styles.groupedCard, { borderTopColor: theme.primary, borderTopWidth: 4 }]}>
+
                 {/* Person Header */}
                 <View style={styles.groupedCardHeader}>
-                  <View style={[styles.alertIconBg, { backgroundColor: COLORS.primary + '15', width: 32, height: 32, marginRight: 10 }]}>
-                    <Ionicons name="person-outline" size={16} color={COLORS.primary} />
+                  <View style={[styles.alertIconBg, { backgroundColor: theme.primary + '15', width: 32, height: 32, marginRight: 10 }]}>
+                    <Ionicons name="person-outline" size={16} color={theme.primary} />
                   </View>
                   <View>
                     <Text style={styles.groupedCardTitle}>{person}</Text>
                     <Text style={styles.groupedCardSub}>{items.length} Pending Request{items.length > 1 ? 's' : ''}</Text>
                   </View>
                 </View>
-                
+
                 {/* Person's Items */}
                 {items.map((item, index) => {
                   const isExpanded = expandedReq === item.row;
                   const isLast = index === items.length - 1;
-                  
+
                   return (
                     <View key={`req_${item.row}`} style={[styles.itemRow, isLast && { borderBottomWidth: 0 }]}>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         activeOpacity={0.7}
                         onPress={() => handleExpandRequest(item)}
                         style={styles.itemRowHeader}
@@ -262,7 +265,7 @@ export default function AlertsScreen({ navigation }) {
                           <Text style={styles.alertTitle}>{item.itemName}</Text>
                           <Text style={styles.alertDesc}>Needs {item.qty} units ({item.date})</Text>
                         </View>
-                        <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={COLORS.textMuted} />
+                        <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={theme.textMuted} />
                       </TouchableOpacity>
 
                       {/* Interactive Expandable Section */}
@@ -271,46 +274,46 @@ export default function AlertsScreen({ navigation }) {
                           <Text style={styles.expandLabel}>Negotiate Quantity (Max: {item.qty})</Text>
                           <View style={styles.stepperContainer}>
                             <TouchableOpacity style={styles.stepperBtn} onPress={() => changeQty(-1, item.qty)}>
-                              <Ionicons name="remove" size={20} color={COLORS.text} />
+                              <Ionicons name="remove" size={20} color={theme.text} />
                             </TouchableOpacity>
                             <Text style={styles.stepperValue}>{approveQty}</Text>
                             <TouchableOpacity style={styles.stepperBtn} onPress={() => changeQty(1, item.qty)}>
-                              <Ionicons name="add" size={20} color={COLORS.text} />
+                              <Ionicons name="add" size={20} color={theme.text} />
                             </TouchableOpacity>
                           </View>
 
                           <Text style={styles.expandLabel}>Admin Remarks</Text>
-                          <TextInput 
+                          <TextInput
                             style={styles.remarksInput}
                             placeholder="Add a note (e.g., Short on stock)..."
-                            placeholderTextColor={COLORS.textMuted}
+                            placeholderTextColor={theme.textMuted}
                             value={remarks}
                             onChangeText={setRemarks}
                           />
 
                           {/* Action Buttons Row */}
                           <View style={styles.actionButtonsRow}>
-                            <TouchableOpacity 
-                              style={[styles.actionBtn, styles.declineBtn]} 
+                            <TouchableOpacity
+                              style={[styles.actionBtn, styles.declineBtn]}
                               onPress={() => submitDecline(item.row)}
                               disabled={isDeclining || isApproving}
                             >
                               {isDeclining ? <ActivityIndicator color="#FFF" /> : (
                                 <>
-                                  <Ionicons name="close-circle" size={18} color="#FFF" style={{marginRight: 6}} />
+                                  <Ionicons name="close-circle" size={18} color="#FFF" style={{ marginRight: 6 }} />
                                   <Text style={styles.actionBtnText}>Decline</Text>
                                 </>
                               )}
                             </TouchableOpacity>
 
-                            <TouchableOpacity 
-                              style={[styles.actionBtn, styles.approveBtn]} 
+                            <TouchableOpacity
+                              style={[styles.actionBtn, styles.approveBtn]}
                               onPress={() => submitApproval(item.row)}
                               disabled={isApproving || isDeclining}
                             >
                               {isApproving ? <ActivityIndicator color="#FFF" /> : (
                                 <>
-                                  <Ionicons name="checkmark-circle" size={18} color="#FFF" style={{marginRight: 6}} />
+                                  <Ionicons name="checkmark-circle" size={18} color="#FFF" style={{ marginRight: 6 }} />
                                   <Text style={styles.actionBtnText}>Approve {approveQty}</Text>
                                 </>
                               )}
@@ -327,10 +330,10 @@ export default function AlertsScreen({ navigation }) {
 
             {/* 2. LOW STOCK */}
             {filters.lowStock && alerts.lowStock.map((item, index) => (
-              <View key={`low_${index}`} style={[styles.alertCard, { borderLeftColor: COLORS.danger, borderLeftWidth: 4 }]}>
+              <View key={`low_${index}`} style={[styles.alertCard, { borderLeftColor: theme.danger, borderLeftWidth: 4 }]}>
                 <View style={styles.cardHeader}>
-                  <View style={[styles.alertIconBg, { backgroundColor: COLORS.danger + '15' }]}>
-                    <Ionicons name="trending-down" size={20} color={COLORS.danger} />
+                  <View style={[styles.alertIconBg, { backgroundColor: theme.danger + '15' }]}>
+                    <Ionicons name="trending-down" size={20} color={theme.danger} />
                   </View>
                   <View style={styles.alertContent}>
                     <Text style={styles.alertTitle}>Low Stock: {item.itemName || item[1]}</Text>
@@ -342,18 +345,18 @@ export default function AlertsScreen({ navigation }) {
 
             {/* 3. OVERDUE RETURNS */}
             {filters.returns && Object.entries(groupedReturns).map(([person, items], groupIndex) => (
-              <View key={`ret_group_${groupIndex}`} style={[styles.groupedCard, { borderTopColor: COLORS.warning, borderTopWidth: 4 }]}>
-                
+              <View key={`ret_group_${groupIndex}`} style={[styles.groupedCard, { borderTopColor: theme.warning, borderTopWidth: 4 }]}>
+
                 <View style={styles.groupedCardHeader}>
-                  <View style={[styles.alertIconBg, { backgroundColor: COLORS.warning + '15', width: 32, height: 32, marginRight: 10 }]}>
-                    <Ionicons name="person-outline" size={16} color={COLORS.warning} />
+                  <View style={[styles.alertIconBg, { backgroundColor: theme.warning + '15', width: 32, height: 32, marginRight: 10 }]}>
+                    <Ionicons name="person-outline" size={16} color={theme.warning} />
                   </View>
                   <View>
                     <Text style={styles.groupedCardTitle}>{person}</Text>
                     <Text style={styles.groupedCardSub}>{items.length} Overdue Return{items.length > 1 ? 's' : ''}</Text>
                   </View>
                 </View>
-                
+
                 {items.map((item, index) => {
                   const isLast = index === items.length - 1;
                   return (
@@ -369,14 +372,14 @@ export default function AlertsScreen({ navigation }) {
             ))}
 
             {/* Empty States */}
-            {((!filters.requests && !filters.lowStock && !filters.returns) || 
+            {((!filters.requests && !filters.lowStock && !filters.returns) ||
               (alerts.lowStock.length === 0 && alerts.pendingReturns.length === 0 && alerts.requests.length === 0)) && (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="checkmark-done-circle-outline" size={60} color={COLORS.border} />
-                <Text style={styles.emptyTitle}>All Caught Up!</Text>
-                <Text style={styles.emptySub}>No alerts match your current filters.</Text>
-              </View>
-            )}
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="checkmark-done-circle-outline" size={60} color={theme.border} />
+                  <Text style={styles.emptyTitle}>All Caught Up!</Text>
+                  <Text style={styles.emptySub}>No alerts match your current filters.</Text>
+                </View>
+              )}
           </View>
         )}
         <View style={{ height: 40 }} />
@@ -385,66 +388,66 @@ export default function AlertsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const getStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
   header: { padding: 20, paddingBottom: 10 },
-  headerTitle: { color: COLORS.text, fontSize: 30, fontWeight: '800' },
-  headerSub: { color: COLORS.textMuted, fontSize: 14, marginTop: 4 },
+  headerTitle: { color: theme.text, fontSize: 30, fontWeight: '800' },
+  headerSub: { color: theme.textMuted, fontSize: 14, marginTop: 4 },
   scrollContent: { padding: 16 },
 
   // Preferences
-  preferencesCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 16 },
-  prefIconBox: { width: 44, height: 44, borderRadius: 12, backgroundColor: COLORS.inputBg, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
+  preferencesCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.card, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: theme.border, marginBottom: 16 },
+  prefIconBox: { width: 44, height: 44, borderRadius: 12, backgroundColor: theme.inputBg, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   prefTextContainer: { flex: 1 },
-  prefTitle: { color: COLORS.text, fontSize: 16, fontWeight: '700', marginBottom: 2 },
-  prefSub: { color: COLORS.textMuted, fontSize: 12 },
+  prefTitle: { color: theme.text, fontSize: 16, fontWeight: '700', marginBottom: 2 },
+  prefSub: { color: theme.textMuted, fontSize: 12 },
 
   // Filters
   filterRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
-  filterChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  filterChipText: { color: COLORS.textMuted, fontSize: 13, fontWeight: '600' },
+  filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
+  filterChipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+  filterChipText: { color: theme.textMuted, fontSize: 13, fontWeight: '600' },
   filterChipTextActive: { color: '#FFF' },
 
   alertsList: { gap: 16 },
 
   // Single Items (e.g. Low Stock)
-  alertCard: { backgroundColor: COLORS.card, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden' },
+  alertCard: { backgroundColor: theme.card, borderRadius: 16, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', padding: 16 },
   alertIconBg: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
-  
+
   // Grouped Box Containers
-  groupedCard: { backgroundColor: COLORS.card, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden' },
-  groupedCardHeader: { flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: COLORS.inputBg, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  groupedCardTitle: { color: COLORS.text, fontSize: 16, fontWeight: '700' },
-  groupedCardSub: { color: COLORS.textMuted, fontSize: 12, marginTop: 2 },
-  
+  groupedCard: { backgroundColor: theme.card, borderRadius: 16, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
+  groupedCardHeader: { flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: theme.inputBg, borderBottomWidth: 1, borderBottomColor: theme.border },
+  groupedCardTitle: { color: theme.text, fontSize: 16, fontWeight: '700' },
+  groupedCardSub: { color: theme.textMuted, fontSize: 12, marginTop: 2 },
+
   // Inner Rows for Grouped Items
-  itemRow: { padding: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  itemRow: { padding: 16, borderBottomWidth: 1, borderBottomColor: theme.border },
   itemRowHeader: { flexDirection: 'row', alignItems: 'center' },
 
   // Content Text inside rows/cards
   alertContent: { flex: 1 },
-  alertTitle: { color: COLORS.text, fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  alertDesc: { color: COLORS.textMuted, fontSize: 13, lineHeight: 18 },
+  alertTitle: { color: theme.text, fontSize: 15, fontWeight: '700', marginBottom: 4 },
+  alertDesc: { color: theme.textMuted, fontSize: 13, lineHeight: 18 },
 
   // Expanded Negotiation Section
-  expandedSectionInner: { paddingTop: 16, marginTop: 16, borderTopWidth: 1, borderTopColor: COLORS.border },
-  expandLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', marginBottom: 8 },
-  stepperContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderRadius: 12, alignSelf: 'flex-start', borderWidth: 1, borderColor: COLORS.border, marginBottom: 12 },
+  expandedSectionInner: { paddingTop: 16, marginTop: 16, borderTopWidth: 1, borderTopColor: theme.border },
+  expandLabel: { color: theme.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', marginBottom: 8 },
+  stepperContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 12, alignSelf: 'flex-start', borderWidth: 1, borderColor: theme.border, marginBottom: 12 },
   stepperBtn: { padding: 12, paddingHorizontal: 16 },
-  stepperValue: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', minWidth: 30, textAlign: 'center' },
-  remarksInput: { backgroundColor: COLORS.inputBg, color: COLORS.text, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, fontSize: 14, marginBottom: 16 },
-  
+  stepperValue: { color: theme.text, fontSize: 18, fontWeight: 'bold', minWidth: 30, textAlign: 'center' },
+  remarksInput: { backgroundColor: theme.inputBg, color: theme.text, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.border, fontSize: 14, marginBottom: 16 },
+
   // Action Buttons
   actionButtonsRow: { flexDirection: 'row', gap: 12 },
   actionBtn: { flex: 1, flexDirection: 'row', padding: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  approveBtn: { backgroundColor: COLORS.success },
-  declineBtn: { backgroundColor: COLORS.danger },
+  approveBtn: { backgroundColor: theme.success },
+  declineBtn: { backgroundColor: theme.danger },
   actionBtnText: { color: '#FFF', fontSize: 15, fontWeight: 'bold' },
 
   // Empty State
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 50 },
-  emptyTitle: { color: COLORS.text, fontSize: 18, fontWeight: '700', marginTop: 16, marginBottom: 6 },
-  emptySub: { color: COLORS.textMuted, fontSize: 14, textAlign: 'center' }
+  emptyTitle: { color: theme.text, fontSize: 18, fontWeight: '700', marginTop: 16, marginBottom: 6 },
+  emptySub: { color: theme.textMuted, fontSize: 14, textAlign: 'center' }
 });

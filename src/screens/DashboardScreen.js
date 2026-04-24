@@ -12,11 +12,13 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import { fetchFromGAS, postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 
 export default function DashboardScreen() {
+  const { theme } = useTheme();
+  const styles = getStyles(theme);
   const navigation = useNavigation();
   const [data, setData] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -191,10 +193,10 @@ export default function DashboardScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
       <ScrollView
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} tintColor={COLORS.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} tintColor={theme.primary} />
         }
       >
         <View style={styles.header}>
@@ -239,16 +241,16 @@ export default function DashboardScreen() {
                 onPress={() => navigation.navigate('Inventory')}
                 title="Total Items"
                 value={data.summary?.totalItems}
-                highlightColor={'#f5f5f5'}
+                highlightColor={theme.primary}
               />
-              <SummaryCard title="Items Issued" value={data.summary?.itemsIssued} highlightColor={COLORS.primary} onPress={() => setItemIssuedModalVisible(true)} />
+              <SummaryCard title="Items Issued" value={data.summary?.itemsIssued} highlightColor={theme.primary} onPress={() => setItemIssuedModalVisible(true)} />
             </View>
             <View style={styles.gridRow}>
-              <SummaryCard title="Pending Returns" value={data.summary?.pendingReturns} highlightColor={COLORS.warning} />
+              <SummaryCard title="Pending Returns" value={data.summary?.pendingReturns} highlightColor={theme.warning} />
               <SummaryCard
                 title="Low Stock"
                 value={data.summary?.lowStock}
-                highlightColor={data.summary?.lowStock > 0 ? (COLORS.danger || '#F59E0B') : null}
+                highlightColor={data.summary?.lowStock > 0 ? (theme.danger || '#F59E0B') : null}
                 onPress={() => setLowStockModalVisible(true)}
               />
             </View>
@@ -258,7 +260,7 @@ export default function DashboardScreen() {
             {data.pendingReturns?.length ? data.pendingReturns.map((item, i) => {
               console.log(item);
               const isOverdue = item.overdueDays > 0;
-              const statusColor = isOverdue ? (COLORS.danger || '#EF4444') : (COLORS.success || '#10B981');
+              const statusColor = isOverdue ? (theme.danger || '#EF4444') : (theme.success || '#10B981');
               return (
                 <View key={i} style={styles.listCard}>
                   <View style={{ flex: 1 }}>
@@ -304,7 +306,7 @@ export default function DashboardScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Low Stock Alerts</Text>
               <TouchableOpacity onPress={() => setLowStockModalVisible(false)}>
-                <Ionicons name="close" size={24} color={COLORS.text} />
+                <Ionicons name="close" size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
             <Text style={styles.modalHint}>Long press an item to ignore its alert</Text>
@@ -322,7 +324,7 @@ export default function DashboardScreen() {
                     <Text style={styles.cardSub}>{item.location || 'Location Not Set'}</Text>
                   </View>
                   <View style={styles.warningBadge}>
-                    <Ionicons name="warning" size={16} color={COLORS.warning || '#F59E0B'} />
+                    <Ionicons name="warning" size={16} color={theme.warning || '#F59E0B'} />
                     <Text style={styles.warningText}>{item.current} / {item.min}</Text>
                   </View>
                 </TouchableOpacity>
@@ -346,14 +348,14 @@ export default function DashboardScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Items Issued</Text>
               <TouchableOpacity onPress={() => setItemIssuedModalVisible(false)}>
-                <Ionicons name="close" size={24} color={COLORS.text} />
+                <Ionicons name="close" size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
               {data?.pendingReturns?.length ? data.pendingReturns.map((item, i) => {
                 const isOverdue = item.overdueDays > 0;
-                const statusColor = isOverdue ? (COLORS.danger || '#EF4444') : (COLORS.success || '#10B981');
+                const statusColor = isOverdue ? (theme.danger || '#EF4444') : (theme.success || '#10B981');
 
                 return (
                   <View key={`issued-${i}`} style={styles.listCard}>
@@ -392,45 +394,45 @@ export default function DashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const getStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
   header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
-  headerTitle: { color: COLORS.text, fontSize: 24, fontWeight: 'bold' },
+  headerTitle: { color: theme.text, fontSize: 24, fontWeight: 'bold' },
 
   // Quick Actions Styles
   quickActionsContainer: { marginBottom: 20 },
   quickActionsScroll: { paddingHorizontal: 16, gap: 12 },
   actionButton: { padding: 12, borderRadius: 16, alignItems: 'center', width: 85, height: 95, justifyContent: 'center' },
   actionIconCircle: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  actionLabel: { color: COLORS.text, fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  actionLabel: { color: theme.text, fontSize: 12, fontWeight: '600', textAlign: 'center' },
 
   content: { paddingHorizontal: 16 },
   gridRow: { flexDirection: 'row', gap: 16, marginBottom: 16 },
-  summaryCard: { flex: 1, backgroundColor: COLORS.card, padding: 16, borderRadius: 16, justifyContent: 'center' },
-  summaryTitle: { color: COLORS.textMuted, fontSize: 13, marginBottom: 8 },
-  summaryValue: { color: COLORS.text, fontSize: 28, fontWeight: 'bold' },
+  summaryCard: { flex: 1, backgroundColor: theme.card, padding: 16, borderRadius: 16, justifyContent: 'center' },
+  summaryTitle: { color: theme.textMuted, fontSize: 13, marginBottom: 8 },
+  summaryValue: { color: theme.text, fontSize: 28, fontWeight: 'bold' },
   tapIndicator: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 2 },
 
-  sectionTitle: { color: COLORS.text, fontSize: 18, fontWeight: '600', marginTop: 8, marginBottom: 12 },
-  listCard: { flexDirection: 'row', backgroundColor: COLORS.card, padding: 16, borderRadius: 12, marginBottom: 12, alignItems: 'center' },
-  cardTitle: { color: COLORS.text, fontWeight: '600', marginBottom: 4 },
-  cardSub: { color: COLORS.textMuted, fontSize: 12, marginBottom: 2 },
+  sectionTitle: { color: theme.text, fontSize: 18, fontWeight: '600', marginTop: 8, marginBottom: 12 },
+  listCard: { flexDirection: 'row', backgroundColor: theme.card, padding: 16, borderRadius: 12, marginBottom: 12, alignItems: 'center' },
+  cardTitle: { color: theme.text, fontWeight: '600', marginBottom: 4 },
+  cardSub: { color: theme.textMuted, fontSize: 12, marginBottom: 2 },
 
-  warningBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: (COLORS.warning || '#F59E0B') + '20', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  warningText: { color: COLORS.warning || '#F59E0B', fontWeight: 'bold' },
+  warningBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: (theme.warning || '#F59E0B') + '20', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  warningText: { color: theme.warning || '#F59E0B', fontWeight: 'bold' },
 
   actionColumn: { alignItems: 'flex-end', gap: 8 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   statusText: { fontWeight: 'bold', fontSize: 12 },
-  returnButton: { backgroundColor: COLORS.primary || '#3B82F6', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  returnButton: { backgroundColor: theme.primary || '#3B82F6', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
   returnButtonText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
 
-  emptyText: { color: COLORS.textMuted, textAlign: 'center', marginVertical: 20 },
+  emptyText: { color: theme.textMuted, textAlign: 'center', marginVertical: 20 },
 
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: COLORS.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '80%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: COLORS.card },
-  modalTitle: { color: COLORS.text, fontSize: 20, fontWeight: 'bold' },
-  modalHint: { color: COLORS.textMuted, fontSize: 12, marginBottom: 16, textAlign: 'center', fontStyle: 'italic' },
+  modalContent: { backgroundColor: theme.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '80%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: theme.card },
+  modalTitle: { color: theme.text, fontSize: 20, fontWeight: 'bold' },
+  modalHint: { color: theme.textMuted, fontSize: 12, marginBottom: 16, textAlign: 'center', fontStyle: 'italic' },
 });

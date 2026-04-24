@@ -6,7 +6,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
-import { COLORS } from '../constants/theme';
+// Theme Context 
+import { useTheme } from '../context/ThemeContext'; 
 
 // Screens
 import AlertsScreen from '../screens/AlertsScreen';
@@ -30,14 +31,15 @@ const Stack = createNativeStackNavigator();
 // Bottom Tab Components
 function BottomTabs({ userData, setToken }) {
   const isAdmin = userData?.role === 'admin';
+  const { theme } = useTheme();
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.textMuted,
-        tabBarStyle: { backgroundColor: COLORS.card, borderTopColor: COLORS.border },
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.textMuted, 
+        tabBarStyle: { backgroundColor: theme.card, borderTopColor: theme.border }, 
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
           if (route.name === 'Dashboard') iconName = focused ? 'home' : 'home-outline';
@@ -56,7 +58,6 @@ function BottomTabs({ userData, setToken }) {
       {isAdmin && <Tab.Screen name="Inventory" component={InventoryScreen} />}
 
       {/* shared tab */}
-      <Tab.Screen name="Scan" component={ScannerScreen} />
 
       {/* TL ONLY TAB */}
       {!isAdmin && (
@@ -64,6 +65,8 @@ function BottomTabs({ userData, setToken }) {
           {(props) => <RequestItemScreen {...props} userData={userData} />}
         </Tab.Screen>
       )}
+      
+      <Tab.Screen name="Scan" component={ScannerScreen} />
 
       {/* QUICK TAKEOUT TAB */}
       {!isAdmin && (
@@ -77,17 +80,6 @@ function BottomTabs({ userData, setToken }) {
       <Tab.Screen name="Profile">
         {(props) => <ProfileScreen {...props} userData={userData} setToken={setToken} />}
       </Tab.Screen>
-
-      {/* Report Tab */}
-      {/* {isAdmin && <Tab.Screen
-        name="Reports"
-        component={ReportScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="document-text-outline" size={size} color={color} />
-          ),
-        }}
-      />} */}
     </Tab.Navigator>
   );
 }
@@ -96,7 +88,9 @@ function BottomTabs({ userData, setToken }) {
 export default function AppNavigator() {
   const [isLoading, setIsLoading] = useState(true);
   const [userToken, setUserToken] = useState(null);
-  const [userData, setUserData] = useState(null); // <-- Store User Role here
+  const [userData, setUserData] = useState(null); 
+  
+  const { theme } = useTheme(); // <-- Grab dynamic colors for Loading Screen
 
   // Check for existing login on app start
   useEffect(() => {
@@ -120,8 +114,8 @@ export default function AppNavigator() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
@@ -130,7 +124,6 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {userToken == null ? (
-          // NO TOKEN: Show Login Screen Stack
           <>
             <Stack.Screen name="SignIn">
               {(props) => (
@@ -158,7 +151,7 @@ export default function AppNavigator() {
               {(props) => <BottomTabs {...props} userData={userData} setToken={setUserToken} />}
             </Stack.Screen>
 
-            {/* Quick Actions / Stack Screens (Admin only usually, but safe to keep here) */}
+            {/* Quick Actions / Stack Screens */}
             <Stack.Screen name="StockIn" component={StockInScreen} />
             <Stack.Screen name="Cupboard" component={CupboardScreen} />
             <Stack.Screen name="Relocate" component={RelocateScreen} />

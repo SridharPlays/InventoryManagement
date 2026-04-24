@@ -1,21 +1,23 @@
-import React, { useState, useRef } from 'react';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Switch, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRef, useState } from 'react';
+import { Alert, Image, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { COLORS } from '../constants/theme';
-import { StorageService } from '../services/storage';
+import { Audio } from 'expo-av';
 import { useNavigation } from 'expo-router';
 import { CAPS_APPS } from '../constants/apps';
-import { Audio } from 'expo-av';
+import { useTheme } from '../context/ThemeContext';
+import { StorageService } from '../services/storage';
 
 export default function ProfileScreen({ userData, setToken }) {
+  const { theme, isDarkMode, toggleTheme } = useTheme();
+  const styles = getStyles(theme);
+
   const [contactModalVisible, setContactModalVisible] = useState(false);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
   const [preferencesModalVisible, setPreferencesModalVisible] = useState(false);
   const [appsModalVisible, setAppsModalVisible] = useState(false);
-  const [themeModalVisible, setThemeModalVisible] = useState(false);
 
   const [tapCount, setTapCount] = useState(0);
   const [soundIndex, setSoundIndex] = useState(0);
@@ -32,46 +34,50 @@ export default function ProfileScreen({ userData, setToken }) {
   ];
 
   const playNextSound = async () => {
-    const { sound } = await Audio.Sound.createAsync(
-      soundsList[soundIndex]
-    );
+    const { sound } = await Audio.Sound.createAsync(soundsList[soundIndex]);
     soundRef.current = sound;
     await sound.playAsync();
-
-    // move to next sound (loop back after last)
     setSoundIndex((prev) => (prev + 1) % soundsList.length);
   };
 
   const handlePress = () => {
     const newCount = tapCount + 1;
     setTapCount(newCount);
-
     if (newCount === 20) {
       playNextSound();
       setTapCount(0);
     }
   };
-  // sort caps apps, show non-draft apps first
+
   const sortedCapsApps = [...CAPS_APPS].sort((a, b) => {
     if (a.isDraft === b.isDraft) return 0;
     return a.isDraft ? 1 : -1;
   });
 
   const handleLogout = async () => {
-    Alert.alert("Log Out", "Are you sure you want to log out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Log Out",
-        style: "destructive",
-        onPress: async () => {
-          await AsyncStorage.removeItem('userToken');
-          await AsyncStorage.removeItem('userData');
-
-          await StorageService.clearSession();
-          setToken(null);
-        }
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm("Are you sure you want to log out?");
+      if (confirmed) {
+        await AsyncStorage.removeItem('userToken');
+        await AsyncStorage.removeItem('userData');
+        await StorageService.clearSession();
+        setToken(null);
       }
-    ]);
+    } else {
+      Alert.alert("Log Out", "Are you sure you want to log out?", [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Log Out",
+          style: "destructive",
+          onPress: async () => {
+            await AsyncStorage.removeItem('userToken');
+            await AsyncStorage.removeItem('userData');
+            await StorageService.clearSession();
+            setToken(null);
+          }
+        }
+      ]);
+    }
   };
 
   const handleClearCache = async () => {
@@ -102,19 +108,19 @@ export default function ProfileScreen({ userData, setToken }) {
     <TouchableOpacity style={styles.profileItem} onPress={onPress}>
       <View style={styles.profileItemLeft}>
         <View style={styles.iconBox}>
-          <MaterialCommunityIcons name={icon} size={20} color={COLORS.text} />
+          <MaterialCommunityIcons name={icon} size={20} color={theme.text} />
         </View>
         <Text style={styles.profileItemLabel}>{label}</Text>
       </View>
       <View style={styles.profileItemRight}>
         {value && <Text style={styles.profileItemValue}>{value}</Text>}
-        <Ionicons name={rightIcon} size={20} color={COLORS.textMuted} />
+        <Ionicons name={rightIcon} size={20} color={theme.textMuted} />
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.scrollContentProfile}>
         <View style={styles.headerProfile}>
           <Text style={styles.headerTitle}>Profile</Text>
@@ -122,16 +128,12 @@ export default function ProfileScreen({ userData, setToken }) {
 
         <TouchableOpacity style={styles.userCard} onPress={handlePress}>
           <View style={styles.avatarPlaceholder}>
-            {/* <Text style={{ color: COLORS.text, fontSize: 20, fontWeight: 'bold' }}>
-              {userData?.name ? userData.name.charAt(0).toUpperCase() : <Ionicons name="person" size={24} color={COLORS.textMuted} />}
-            </Text> */}
             <Image source={require('../../assets/images/caps_logo.png')} style={styles.avatar} />
           </View>
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{userData?.name || 'Guest User'}</Text>
             <Text style={styles.userEmail}>{userData?.email || 'No email found'}</Text>
           </View>
-          {/* <Ionicons name="create-outline" size={20} color={COLORS.textMuted} /> */}
         </TouchableOpacity>
 
         <Text style={styles.sectionTitle}>About</Text>
@@ -147,7 +149,20 @@ export default function ProfileScreen({ userData, setToken }) {
           <View style={styles.itemDivider} />
           <ProfileItem icon="help-circle-outline" label="Help & Support" onPress={() => setHelpModalVisible(true)} />
           <View style={styles.itemDivider} />
-          <ProfileItem icon="palette" label="Themes" onPress={() => setThemeModalVisible(true)} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 }}>
+            <View style={styles.profileItemLeft}>
+              <View style={styles.iconBox}>
+                <MaterialCommunityIcons name={"palette"} size={20} color={theme.text} />
+              </View>
+              <Text style={styles.profileItemLabel}>Switch Theme</Text>
+            </View>
+            <Switch
+              trackColor={{ false: theme.border, true: theme.primary }}
+              thumbColor={theme.primary}
+              onValueChange={toggleTheme}
+              value={isDarkMode}
+            />
+          </View>
           <View style={styles.itemDivider} />
           <ProfileItem icon="grid" label="More Applications" onPress={() => setAppsModalVisible(true)} />
         </View>
@@ -156,18 +171,18 @@ export default function ProfileScreen({ userData, setToken }) {
           <TouchableOpacity style={styles.profileItem} onPress={handleClearCache}>
             <View style={styles.profileItemLeft}>
               <View style={styles.iconBox}>
-                <Ionicons name="trash-outline" size={20} color={COLORS.danger || '#EF4444'} />
+                <Ionicons name="trash-outline" size={20} color={theme.danger} />
               </View>
-              <Text style={[styles.profileItemLabel, { color: COLORS.danger || '#EF4444' }]}>Clear Cache</Text>
+              <Text style={[styles.profileItemLabel, { color: theme.danger }]}>Clear Cache</Text>
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.profileItem} onPress={handleLogout}>
             <View style={styles.profileItemLeft}>
               <View style={styles.iconBox}>
-                <Ionicons name="log-out-outline" size={20} color={COLORS.danger || '#EF4444'} />
+                <Ionicons name="log-out-outline" size={20} color={theme.danger} />
               </View>
-              <Text style={[styles.profileItemLabel, { color: COLORS.danger || '#EF4444' }]}>Log out</Text>
+              <Text style={[styles.profileItemLabel, { color: theme.danger }]}>Log out</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -181,7 +196,7 @@ export default function ProfileScreen({ userData, setToken }) {
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>Mail Notifications</Text>
               <Switch
-                trackColor={{ false: COLORS.border || '#767577', true: COLORS.primary || '#007BFF' }}
+                trackColor={{ false: theme.border, true: theme.primary }}
                 thumbColor={'#f4f3f4'}
                 ios_backgroundColor="#3e3e3e"
                 onValueChange={setMailEnabled}
@@ -244,7 +259,7 @@ export default function ProfileScreen({ userData, setToken }) {
               <View style={styles.bottomSheetHeaderTitleRow}>
                 <Text style={styles.bottomSheetTitle}>More CAPS Apps</Text>
                 <TouchableOpacity onPress={() => setAppsModalVisible(false)}>
-                  <Ionicons name="close" size={24} color={COLORS.textMuted} />
+                  <Ionicons name="close" size={24} color={theme.textMuted} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -255,6 +270,12 @@ export default function ProfileScreen({ userData, setToken }) {
                   key={app.id}
                   style={[styles.appCard, app.isDraft && styles.appCardDraft]}
                   activeOpacity={app.isDraft ? 1 : 0.7}
+                  onPress={() => {
+                    if (!app.isDraft && userData?.role === 'admin') {
+                      setAppsModalVisible(false);
+                      navigate.navigate(app.redirectTo);
+                    }
+                  }}
                 >
                   <View style={styles.appLogoContainer}>
                     <Image
@@ -268,18 +289,18 @@ export default function ProfileScreen({ userData, setToken }) {
                     <Text style={styles.appCardDesc}>{app.desc}</Text>
 
                     {app.isDraft && (
-                      <View style={[styles.draftBadge, { borderColor: COLORS.border || '#E5E7EB' }]}>
-                        <Ionicons name="time-outline" size={12} color={COLORS.textMuted || '#6B7280'} style={{ marginRight: 4 }} />
-                        <Text style={[styles.draftBadgeText, { color: COLORS.textMuted || '#6B7280' }]}>Under Development</Text>
+                      <View style={[styles.draftBadge, { borderColor: theme.border }]}>
+                        <Ionicons name="time-outline" size={12} color={theme.textMuted} style={{ marginRight: 4 }} />
+                        <Text style={[styles.draftBadgeText, { color: theme.textMuted }]}>Under Development</Text>
                       </View>
                     )}
                   </View>
 
                   <TouchableOpacity
-                    style={[styles.openBtn, app.isDraft && { backgroundColor: COLORS.border || '#E5E7EB' }]}
-                    disabled={app.isDraft}
+                    style={[styles.openBtn, app.isDraft && { backgroundColor: theme.border }]}
+                    disabled={app.isDraft && userData?.role === 'admin'}
                     onPress={() => {
-                      if (!app.isDraft) {
+                      if (!app.isDraft && userData?.role === 'admin') {
                         setAppsModalVisible(false);
                         navigate.navigate(app.redirectTo);
                       }
@@ -287,7 +308,7 @@ export default function ProfileScreen({ userData, setToken }) {
                   >
                     <Text style={[
                       styles.openBtnText,
-                      app.isDraft && { color: COLORS.textMuted || '#9CA3AF' }
+                      app.isDraft && { color: theme.textMuted }
                     ]}>
                       {app.isDraft ? 'Soon' : 'Open'}
                     </Text>
@@ -302,56 +323,60 @@ export default function ProfileScreen({ userData, setToken }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const getStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
   scrollContentProfile: { padding: 20 },
   headerProfile: { flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', marginBottom: 30 },
-  iconButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { color: COLORS.text, fontSize: 24, fontWeight: 'bold' },
-  userCard: { backgroundColor: COLORS.card, flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, marginBottom: 30 },
-  avatarPlaceholder: { width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.inputBg, justifyContent: 'center', alignItems: 'center' },
+  iconButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.card, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { color: theme.text, fontSize: 24, fontWeight: 'bold' },
+  userCard: { backgroundColor: theme.card, flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, marginBottom: 30 },
+  avatarPlaceholder: { width: 50, height: 50, borderRadius: 25, backgroundColor: theme.inputBg, justifyContent: 'center', alignItems: 'center' },
   avatar: { width: '100%', height: '100%', borderRadius: 25 },
   userInfo: { flex: 1, marginLeft: 15 },
-  userName: { color: COLORS.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-  userEmail: { color: COLORS.textMuted, fontSize: 13 },
-  sectionTitle: { color: COLORS.textMuted, fontSize: 13, marginBottom: 10, marginLeft: 5 },
-  cardGroup: { backgroundColor: COLORS.card, borderRadius: 16, marginBottom: 20, overflow: 'hidden' },
+  userName: { color: theme.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
+  userEmail: { color: theme.textMuted, fontSize: 13 },
+  sectionTitle: { color: theme.textMuted, fontSize: 13, marginBottom: 10, marginLeft: 5 },
+  cardGroup: { backgroundColor: theme.card, borderRadius: 16, marginBottom: 20, overflow: 'hidden' },
   profileItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
   profileItemLeft: { flexDirection: 'row', alignItems: 'center' },
-  iconBox: { width: 32, height: 32, borderRadius: 8, backgroundColor: COLORS.inputBg, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  profileItemLabel: { color: COLORS.text, fontSize: 15 },
+  iconBox: { width: 32, height: 32, borderRadius: 8, backgroundColor: theme.inputBg, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  profileItemLabel: { color: theme.text, fontSize: 15 },
   profileItemRight: { flexDirection: 'row', alignItems: 'center' },
-  profileItemValue: { color: COLORS.textMuted, fontSize: 13, marginRight: 8 },
-  itemDivider: { height: 1, backgroundColor: COLORS.border, marginLeft: 60 },
+  profileItemValue: { color: theme.textMuted, fontSize: 13, marginRight: 8 },
+  itemDivider: { height: 1, backgroundColor: theme.border, marginLeft: 60 },
+
+  // Modals (Contact, Help, Preferences, Theme)
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
-  modalContent: { width: '80%', backgroundColor: COLORS.card || '#FFF', borderRadius: 16, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.text, marginBottom: 15 },
-  modalText: { fontSize: 15, color: COLORS.textMuted, textAlign: 'center', marginBottom: 20, lineHeight: 22 },
-  modalButton: { backgroundColor: COLORS.primary || '#007BFF', paddingVertical: 10, paddingHorizontal: 24, borderRadius: 8, width: '100%', alignItems: 'center' },
+  modalContent: { width: '80%', backgroundColor: theme.card, borderRadius: 16, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: theme.text, marginBottom: 15 },
+  modalText: { fontSize: 15, color: theme.textMuted, textAlign: 'center', marginBottom: 20, lineHeight: 22 },
+  modalButton: { backgroundColor: theme.primary, paddingVertical: 10, paddingHorizontal: 24, borderRadius: 8, width: '100%', alignItems: 'center' },
   modalButtonText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 25, marginTop: 10 },
-  switchLabel: { fontSize: 16, color: COLORS.text, fontWeight: '500' },
+  switchLabel: { fontSize: 16, color: theme.text, fontWeight: '500' },
   modalActionRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', gap: 12 },
   modalButtonBase: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  modalButtonCancel: { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.border || '#E5E7EB' },
-  modalButtonPrimary: { backgroundColor: COLORS.primary || '#007BFF' },
-  modalButtonCancelText: { color: COLORS.textMuted || '#6B7280', fontSize: 16, fontWeight: '600' },
+  modalButtonCancel: { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.border },
+  modalButtonPrimary: { backgroundColor: theme.primary },
+  modalButtonCancelText: { color: theme.textMuted, fontSize: 16, fontWeight: '600' },
+
+  // Bottom Sheet App Modal
   bottomSheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  bottomSheetContainer: { backgroundColor: COLORS.background || '#F9FAFB', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '70%', paddingBottom: 20 },
-  bottomSheetHeader: { padding: 20, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border || '#E5E7EB' },
-  dragHandle: { width: 40, height: 4, backgroundColor: COLORS.border || '#D1D5DB', borderRadius: 2, alignSelf: 'center', marginBottom: 15 },
+  bottomSheetContainer: { backgroundColor: theme.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '70%', paddingBottom: 20 },
+  bottomSheetHeader: { padding: 20, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: theme.border },
+  dragHandle: { width: 40, height: 4, backgroundColor: theme.border, borderRadius: 2, alignSelf: 'center', marginBottom: 15 },
   bottomSheetHeaderTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  bottomSheetTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text },
+  bottomSheetTitle: { fontSize: 18, fontWeight: 'bold', color: theme.text },
   appListContainer: { padding: 20 },
-  appCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card || '#FFF', padding: 15, borderRadius: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
+  appCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.card, padding: 15, borderRadius: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
   appCardDraft: { opacity: 0.65 },
-  appLogoContainer: { width: 60, height: 60, borderRadius: 12, overflow: 'hidden', marginRight: 15, backgroundColor: COLORS.border || '#E5E7EB' },
+  appLogoContainer: { width: 60, height: 60, borderRadius: 12, overflow: 'hidden', marginRight: 15, backgroundColor: theme.border },
   appImage: { width: '100%', height: '100%' },
   appCardInfo: { flex: 1 },
-  appCardName: { fontSize: 16, fontWeight: '600', color: COLORS.text, marginBottom: 2 },
-  appCardDesc: { fontSize: 12, color: COLORS.textMuted, marginBottom: 6 },
+  appCardName: { fontSize: 16, fontWeight: '600', color: theme.text, marginBottom: 2 },
+  appCardDesc: { fontSize: 12, color: theme.textMuted, marginBottom: 6 },
   draftBadge: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start' },
   draftBadgeText: { fontSize: 10, fontWeight: '600' },
-  openBtn: { backgroundColor: `${COLORS.primary || '#007BFF'}15`, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20 },
-  openBtnText: { color: COLORS.primary || '#007BFF', fontSize: 13, fontWeight: '600' },
+  openBtn: { backgroundColor: `${theme.primary}15`, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20 },
+  openBtnText: { color: theme.primary, fontSize: 13, fontWeight: '600' },
 });

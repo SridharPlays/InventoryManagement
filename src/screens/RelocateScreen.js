@@ -11,13 +11,16 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS } from '../constants/theme';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
+
+import { useTheme } from '../context/ThemeContext';
 
 // CUSTOM INLINE DROPDOWN COMPONENT (Adapted for Selection)
 const CustomDropdown = ({ label, options, selectedValue, onSelect, placeholder }) => {
     const [isExpanded, setIsExpanded] = useState(false);
+    const { theme } = useTheme();
+    const styles = getStyles(theme);
 
     return (
         <View style={styles.customDropdownContainer}>
@@ -28,17 +31,17 @@ const CustomDropdown = ({ label, options, selectedValue, onSelect, placeholder }
                 activeOpacity={0.7}
                 onPress={() => setIsExpanded(!isExpanded)}
             >
-                <Text style={{ color: selectedValue ? COLORS.text : COLORS.textMuted, fontSize: 15 }}>
+                <Text style={{ color: selectedValue ? theme.text : theme.textMuted, fontSize: 15 }}>
                     {selectedValue ? (label.includes("Cupboard") ? `Cupboard ${selectedValue}` : selectedValue) : placeholder}
                 </Text>
-                <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={COLORS.textMuted} />
+                <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={theme.textMuted} />
             </TouchableOpacity>
 
             {isExpanded && (
                 <View style={styles.dropdownListContainer}>
                     <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
                         {options.length === 0 ? (
-                            <Text style={{ padding: 14, color: COLORS.textMuted }}>No options available</Text>
+                            <Text style={{ padding: 14, color: theme.textMuted }}>No options available</Text>
                         ) : (
                             options.map((option) => (
                                 <TouchableOpacity
@@ -46,7 +49,7 @@ const CustomDropdown = ({ label, options, selectedValue, onSelect, placeholder }
                                     style={[styles.dropdownOption, selectedValue === option && styles.dropdownOptionSelected]}
                                     onPress={() => { onSelect(option); setIsExpanded(false); }}
                                 >
-                                    <Text style={{ color: selectedValue === option ? COLORS.primary : COLORS.text }}>
+                                    <Text style={{ color: selectedValue === option ? theme.primary : theme.text }}>
                                         {label.includes("Cupboard") ? `Cupboard ${option}` : option}
                                     </Text>
                                 </TouchableOpacity>
@@ -61,6 +64,9 @@ const CustomDropdown = ({ label, options, selectedValue, onSelect, placeholder }
 
 export default function RelocateScreen({ route, navigation }) {
     const initialItemId = route.params?.initialItemId || null;
+
+    const { theme } = useTheme();
+    const styles = getStyles(theme);
 
     const [items, setItems] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -161,7 +167,7 @@ export default function RelocateScreen({ route, navigation }) {
                 <Ionicons
                     name={isSelected ? "checkmark-circle" : "ellipse-outline"}
                     size={24}
-                    color={isSelected ? COLORS.primary : COLORS.textMuted}
+                    color={isSelected ? theme.primary : theme.textMuted}
                     style={{ marginRight: 12 }}
                 />
                 <View style={styles.iconPlaceholder}>
@@ -179,10 +185,10 @@ export default function RelocateScreen({ route, navigation }) {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
             <View style={styles.headerRow}>
                 <TouchableOpacity onPress={() => step === 2 ? setStep(1) : navigation.goBack()}>
-                    <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+                    <Ionicons name="arrow-back" size={24} color={theme.text} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{step === 1 ? 'Select Items' : 'Set Destination'}</Text>
                 <View style={{ width: 24 }} />
@@ -192,11 +198,11 @@ export default function RelocateScreen({ route, navigation }) {
                 // STEP 1: SELECT ITEMS
                 <View style={{ flex: 1, paddingHorizontal: 16 }}>
                     <View style={styles.searchContainer}>
-                        <Ionicons name="search" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
+                        <Ionicons name="search" size={20} color={theme.textMuted} style={styles.searchIcon} />
                         <TextInput
                             style={styles.searchInput}
                             placeholder="Search items to relocate..."
-                            placeholderTextColor={COLORS.textMuted}
+                            placeholderTextColor={theme.textMuted}
                             value={searchQuery}
                             onChangeText={setSearchQuery}
                         />
@@ -231,9 +237,9 @@ export default function RelocateScreen({ route, navigation }) {
                 // STEP 2: SET DESTINATION
                 <ScrollView style={{ flex: 1, padding: 20 }} keyboardShouldPersistTaps="handled">
                     <View style={styles.summaryBox}>
-                        <Ionicons name="information-circle" size={24} color={COLORS.primary} style={{ marginRight: 10 }} />
+                        <Ionicons name="information-circle" size={24} color={theme.primary} style={{ marginRight: 10 }} />
                         <Text style={styles.summaryText}>
-                            Relocating <Text style={{ fontWeight: 'bold', color: COLORS.text }}>{selectedIds.length} items</Text>.
+                            Relocating <Text style={{ fontWeight: 'bold', color: theme.text }}>{selectedIds.length} items</Text>.
                             Leave dropdowns blank if you do not want to change them.
                         </Text>
                     </View>
@@ -264,7 +270,7 @@ export default function RelocateScreen({ route, navigation }) {
                             <TextInput
                                 style={styles.input}
                                 placeholder="e.g., 2"
-                                placeholderTextColor={COLORS.textMuted}
+                                placeholderTextColor={theme.textMuted}
                                 value={newRack}
                                 onChangeText={setNewRack}
                             />
@@ -288,51 +294,51 @@ export default function RelocateScreen({ route, navigation }) {
     );
 }
 
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
+const getStyles = (theme) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
     headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
-    headerTitle: { color: COLORS.text, fontSize: 20, fontWeight: 'bold' },
+    headerTitle: { color: theme.text, fontSize: 20, fontWeight: 'bold' },
 
-    searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.inputBg, borderRadius: 12, paddingHorizontal: 12, marginBottom: 16 },
+    searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 12, paddingHorizontal: 12, marginBottom: 16 },
     searchIcon: { marginRight: 8 },
-    searchInput: { flex: 1, color: COLORS.text, height: 48, fontSize: 15 },
+    searchInput: { flex: 1, color: theme.text, height: 48, fontSize: 15 },
 
     selectionBar: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 4 },
-    selectionText: { color: COLORS.text, fontWeight: '600' },
-    selectAllText: { color: COLORS.primary, fontWeight: '600' },
+    selectionText: { color: theme.text, fontWeight: '600' },
+    selectAllText: { color: theme.primary, fontWeight: '600' },
 
-    itemCard: { flexDirection: 'row', backgroundColor: COLORS.card, padding: 12, borderRadius: 12, marginBottom: 8, alignItems: 'center', borderWidth: 1, borderColor: 'transparent' },
-    itemCardSelected: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '10' },
-    iconPlaceholder: { width: 50, height: 50, borderRadius: 8, backgroundColor: COLORS.inputBg, marginRight: 12 },
+    itemCard: { flexDirection: 'row', backgroundColor: theme.card, padding: 12, borderRadius: 12, marginBottom: 8, alignItems: 'center', borderWidth: 1, borderColor: 'transparent' },
+    itemCardSelected: { borderColor: theme.primary, backgroundColor: theme.primary + '10' },
+    iconPlaceholder: { width: 50, height: 50, borderRadius: 8, backgroundColor: theme.inputBg, marginRight: 12 },
     itemContent: { flex: 1 },
-    itemName: { color: COLORS.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-    itemSub: { color: COLORS.textMuted, fontSize: 13 },
+    itemName: { color: theme.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
+    itemSub: { color: theme.textMuted, fontSize: 13 },
 
     bottomBar: { position: 'absolute', bottom: 20, left: 16, right: 16 },
-    primaryButton: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+    primaryButton: { backgroundColor: theme.primary, paddingVertical: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
     primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 
-    summaryBox: { flexDirection: 'row', backgroundColor: COLORS.primary + '15', padding: 16, borderRadius: 12, marginBottom: 24, alignItems: 'center' },
-    summaryText: { color: COLORS.textMuted, flex: 1, fontSize: 14, lineHeight: 20 },
+    summaryBox: { flexDirection: 'row', backgroundColor: theme.primary + '15', padding: 16, borderRadius: 12, marginBottom: 24, alignItems: 'center' },
+    summaryText: { color: theme.textMuted, flex: 1, fontSize: 14, lineHeight: 20 },
 
     inputGroup: { marginBottom: 16 },
-    inputLabel: { color: COLORS.text, fontSize: 14, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
-    input: { backgroundColor: COLORS.inputBg, color: COLORS.text, borderRadius: 12, paddingHorizontal: 16, height: 52, fontSize: 15 },
+    inputLabel: { color: theme.text, fontSize: 14, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
+    input: { backgroundColor: theme.inputBg, color: theme.text, borderRadius: 12, paddingHorizontal: 16, height: 52, fontSize: 15 },
     row: { flexDirection: 'row' },
 
     // Dropdown Styles
     customDropdownContainer: { marginBottom: 20 },
-    dropdownSelector: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.inputBg, padding: 16, borderRadius: 12, height: 52 },
+    dropdownSelector: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.inputBg, padding: 16, borderRadius: 12, height: 52 },
 
     dropdownListContainer: {
-        backgroundColor: COLORS.inputBg,
+        backgroundColor: theme.inputBg,
         borderRadius: 12,
         marginTop: 8,
         borderWidth: 1,
-        borderColor: COLORS.card,
+        borderColor: theme.card,
         overflow: 'hidden'
     },
 
-    dropdownOption: { paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: COLORS.card },
-    dropdownOptionSelected: { backgroundColor: COLORS.primary + '10' },
+    dropdownOption: { paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: theme.card },
+    dropdownOptionSelected: { backgroundColor: theme.primary + '10' },
 });
