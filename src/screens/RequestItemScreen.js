@@ -3,28 +3,32 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
-  Image, Modal,
+  Modal,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
-import { fetchFromGAS, postToGAS } from '../services/api';
+import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
+import { useInventory } from '../hooks/useInventory';
+import { HapticHelper } from '../utils/haptics';
+import { UniversalAlert } from '../utils/UniversalAlert';
 
 export default function RequestItemScreen({ navigation }) {
-  const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [inventory, setInventory] = useState([]);
   const [userName, setUserName] = useState("Team Lead");
 
   const { theme } = useTheme();
   const styles = getStyles(theme);
+
+  // Hook Initialization
+  const { inventory, loading, loadInventory } = useInventory();
 
   // Filtering & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,7 +39,6 @@ export default function RequestItemScreen({ navigation }) {
   const [cart, setCart] = useState({});
   const [cartModalVisible, setCartModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
 
   // Load Cart every time the screen comes into focus
   useFocusEffect(
@@ -51,59 +54,48 @@ export default function RequestItemScreen({ navigation }) {
   );
 
   useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async (forceRefresh = false) => {
-    if (!forceRefresh) setIsLoading(true);
-
-    try {
+    const initData = async () => {
+      loadInventory();
       const session = await StorageService.getSession();
       if (session) {
         const parsed = typeof session === 'string' ? JSON.parse(session) : session;
         if (parsed.name) setUserName(parsed.name);
       }
+    };
+    initData();
+  }, [loadInventory]);
 
-      let inventoryData = [];
+  // Derive Active Items and Categories
+  const activeItems = useMemo(() => {
+    if (!inventory) return [];
+    return inventory.filter(item => item.status === 'Active');
+  }, [inventory]);
 
-      if (!forceRefresh) {
-        inventoryData = await StorageService.getCachedData('getInventory') || [];
-      }
+  useEffect(() => {
+    const uniqueCats = ['All', ...new Set(activeItems.map(item => item.category).filter(Boolean))];
+    setCategories(uniqueCats);
+  }, [activeItems]);
 
-      if (inventoryData.length === 0 || forceRefresh) {
-        inventoryData = await fetchFromGAS('getInventory');
-        await StorageService.cacheData('getInventory', inventoryData); // Update cache with fresh data
-      }
-
-      const activeItems = inventoryData.filter(item => item.status === 'Active');
-      const uniqueCats = ['All', ...new Set(activeItems.map(item => item.category).filter(Boolean))];
-
-      setInventory(activeItems);
-      setCategories(uniqueCats);
-    } catch (error) {
-      console.error("Error loading data:", error);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
-
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    loadData(true);
-  }, []);
+    await loadInventory(true);
+    setIsRefreshing(false);
+  }, [loadInventory]);
 
   // CART LOGIC
   const updateQuantity = (item, delta) => {
     setCart(prev => {
       const currentQty = prev[item.itemId]?.requestQty || 0;
       const newQty = currentQty + delta;
+      const availableStock = parseInt(item.openingStock, 10) || 0;
+
+      if (newQty > availableStock) {
+        UniversalAlert.alert("Stock Limit", `Only ${availableStock} items available in stock.`);
+        HapticHelper.error();
+        return prev;
+      }
 
       const updatedCart = { ...prev };
-
-      if (newQty > item.minStock) {
-
-      }
 
       if (newQty <= 0) {
         delete updatedCart[item.itemId];
@@ -120,11 +112,12 @@ export default function RequestItemScreen({ navigation }) {
   const clearCart = async () => {
     setCart({});
     setCartModalVisible(false);
+    HapticHelper.success();
     await StorageService.removeCachedData('requestCart'); // Clear from storage
   };
 
   const confirmClearCart = () => {
-    Alert.alert(
+    UniversalAlert.alert(
       "Clear Cart",
       "Are you sure you want to remove all items from your request?",
       [
@@ -132,14 +125,14 @@ export default function RequestItemScreen({ navigation }) {
         {
           text: "Clear All",
           style: "destructive",
-          onPress: clearCart // Calls the clearCart function we updated earlier
+          onPress: clearCart 
         }
       ]
     );
   };
 
   // Submit Request
-  const sumbitRequest = async () => {
+  const submitRequest = async () => {
     const cartItems = Object.values(cart);
     if (cartItems.length === 0) return;
 
@@ -161,17 +154,20 @@ export default function RequestItemScreen({ navigation }) {
       const response = await postToGAS('request', payload);
 
       if (response.success) {
-        Alert.alert(
+        HapticHelper.success();
+        UniversalAlert.alert(
           "Request Submitted",
           `Successfully sent ${cartItems.length} items to the Admin for approval.`,
           [{ text: "OK", onPress: () => { clearCart(); navigation.goBack(); } }]
         );
       } else {
-        Alert.alert("Error", response.message || "Failed to submit request.");
+        HapticHelper.error();
+        UniversalAlert.alert("Error", response.message || "Failed to submit request.");
       }
 
     } catch (e) {
-      Alert.alert("Error", "Network error while submitting requests.");
+      HapticHelper.error();
+      UniversalAlert.alert("Error", "Network error while submitting requests.");
     } finally {
       setIsSubmitting(false);
     }
@@ -179,21 +175,22 @@ export default function RequestItemScreen({ navigation }) {
 
   // FILTERING
   const filteredInventory = useMemo(() => {
-    return inventory.filter(item => {
+    return activeItems.filter(item => {
       const matchesSearch = item.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.itemId.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [inventory, searchQuery, activeCategory]);
+  }, [activeItems, searchQuery, activeCategory]);
 
   const cartItemCount = Object.keys(cart).length;
 
   // UI COMPONENTS
   const renderItemCard = ({ item }) => {
     const cartQty = cart[item.itemId]?.requestQty || 0;
+    const availableStock = parseInt(item.openingStock, 10) || 0;
+    const isMaxStock = cartQty >= availableStock;
     const image = item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/caps_logo.png');
-    const isDisabled = false;
 
     return (
       <View style={styles.itemCard}>
@@ -215,12 +212,20 @@ export default function RequestItemScreen({ navigation }) {
                 <Ionicons name="remove" size={18} color={theme.text} />
               </TouchableOpacity>
               <Text style={styles.qtyText}>{cartQty}</Text>
-              <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, 1)}>
+              <TouchableOpacity 
+                style={[styles.qtyBtn, isMaxStock && { opacity: 0.3 }]} 
+                onPress={() => updateQuantity(item, 1)}
+                disabled={isMaxStock}
+              >
                 <Ionicons name="add" size={18} color={theme.text} />
               </TouchableOpacity>
             </>
           ) : (
-            <TouchableOpacity style={styles.addBtn} onPress={() => updateQuantity(item, 1)}>
+            <TouchableOpacity 
+              style={[styles.addBtn, availableStock <= 0 && { opacity: 0.5 }]} 
+              onPress={() => updateQuantity(item, 1)}
+              disabled={availableStock <= 0}
+            >
               <Ionicons name="add" size={18} color={theme.primary} />
               <Text style={styles.addBtnText}>Add</Text>
             </TouchableOpacity>
@@ -275,7 +280,7 @@ export default function RequestItemScreen({ navigation }) {
       </View>
 
       {/* Item List */}
-      {isLoading ? (
+      {loading && !isRefreshing ? (
         <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
@@ -329,23 +334,32 @@ export default function RequestItemScreen({ navigation }) {
             data={Object.values(cart)}
             keyExtractor={item => item.itemId}
             contentContainerStyle={styles.cartList}
-            renderItem={({ item }) => (
-              <View style={styles.cartItem}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cartItemName}>{item.itemName}</Text>
-                  <Text style={styles.cartItemSub}>ID: {item.itemId}</Text>
+            renderItem={({ item }) => {
+              const availableStock = parseInt(item.openingStock, 10) || 0;
+              const isMaxStock = item.requestQty >= availableStock;
+
+              return (
+                <View style={styles.cartItem}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cartItemName}>{item.itemName}</Text>
+                    <Text style={styles.cartItemSub}>ID: {item.itemId}</Text>
+                  </View>
+                  <View style={styles.qtyContainer}>
+                    <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, -1)}>
+                      <Ionicons name="remove" size={18} color={theme.text} />
+                    </TouchableOpacity>
+                    <Text style={styles.qtyText}>{item.requestQty}</Text>
+                    <TouchableOpacity 
+                      style={[styles.qtyBtn, isMaxStock && { opacity: 0.3 }]} 
+                      onPress={() => updateQuantity(item, 1)}
+                      disabled={isMaxStock}
+                    >
+                      <Ionicons name="add" size={18} color={theme.text} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={styles.qtyContainer}>
-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, -1)}>
-                    <Ionicons name="remove" size={18} color={theme.text} />
-                  </TouchableOpacity>
-                  <Text style={styles.qtyText}>{item.requestQty}</Text>
-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, 1)}>
-                    <Ionicons name="add" size={18} color={theme.text} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+              );
+            }}
             ListEmptyComponent={
               <Text style={styles.emptyCartText}>No items added to request.</Text>
             }
@@ -358,7 +372,7 @@ export default function RequestItemScreen({ navigation }) {
           ) : (
             <TouchableOpacity
               style={[styles.submitBtn, cartItemCount === 0 && { opacity: 0.5 }]}
-              onPress={sumbitRequest}
+              onPress={submitRequest}
               disabled={cartItemCount === 0}
             >
               <Ionicons name="send" size={20} color="#FFF" style={{ marginRight: 8 }} />

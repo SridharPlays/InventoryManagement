@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { fetchFromGAS, postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
+import { HapticHelper } from '../utils/haptics';
 
 export default function AlertsScreen({ navigation }) {
   const { theme } = useTheme();
@@ -96,6 +97,7 @@ export default function AlertsScreen({ navigation }) {
       }
     } catch (e) {
       setEmailAlertsEnabled(!newValue);
+      HapticHelper.lightImpact();
     } finally {
       setIsUpdatingPrefs(false);
     }
@@ -105,6 +107,7 @@ export default function AlertsScreen({ navigation }) {
     if (expandedReq === req.row) {
       setExpandedReq(null);
     } else {
+      HapticHelper.lightImpact();
       setExpandedReq(req.row);
       setApproveQty(parseInt(req.qty) || 0);
       setRemarks('');
@@ -131,13 +134,16 @@ export default function AlertsScreen({ navigation }) {
 
       if (response.success) {
         Alert.alert("Approved", "The request has been processed successfully.");
+        HapticHelper.success();
         setExpandedReq(null);
         onRefresh();
       } else {
         Alert.alert("Error", response.message);
+        HapticHelper.error();
       }
     } catch (e) {
       Alert.alert("Error", "Network error.");
+      HapticHelper.error();
     } finally {
       setIsApproving(false);
     }
@@ -153,13 +159,16 @@ export default function AlertsScreen({ navigation }) {
 
       if (response.success) {
         Alert.alert("Declined", "The request has been declined.");
+        HapticHelper.success();
         setExpandedReq(null);
         onRefresh();
       } else {
         Alert.alert("Error", response.message);
+        HapticHelper.error();
       }
     } catch (e) {
       Alert.alert("Error", "Network error.");
+      HapticHelper.error();
     } finally {
       setIsDeclining(false);
     }

@@ -2,60 +2,82 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
+  Modal,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  ScrollView
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme } from '../context/ThemeContext';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
+import { useInventory } from '../hooks/useInventory';
+import { HapticHelper } from '../utils/haptics';
+import { UniversalAlert } from '../utils/UniversalAlert';
+import { set } from '@react-native-firebase/app/dist/module/internal/web/firebaseDatabase';
+import { BlurView } from 'expo-blur';
 
 export default function QuickTakeoutScreen({ navigation }) {
-  const [items, setItems] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [showNotice, setShowNotice] = useState(true);
   const [userData, setUserData] = useState(null);
 
   const { theme } = useTheme();
   const styles = getStyles(theme);
 
+  // Hook Initialization
+  const { inventory, loading, loadInventory } = useInventory();
+
+  // Filtering & Search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [categories, setCategories] = useState(['All']);
+
   // Cart State
   const [cart, setCart] = useState([]);
-  
-  // Step 1: Browse & Cart, Step 2: Checkout & Reason
-  const [step, setStep] = useState(1);
+  const [cartModalVisible, setCartModalVisible] = useState(false);
   const [reason, setReason] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const loadInitialData = async () => {
+    loadInventory();
+    const loadUser = async () => {
       const session = await StorageService.getSession();
-      if (session) setUserData(session);
-
-      const cached = await StorageService.getCachedData('getInventory') || [];
-      const activeItems = cached.filter(item => item.status === 'Active');
-      setItems(activeItems);
+      if (session) {
+        const parsed = typeof session === 'string' ? JSON.parse(session) : session;
+        setUserData(parsed);
+      }
     };
-    loadInitialData();
-  }, []);
+    loadUser();
+  }, [loadInventory]);
+
+  // Derive Active Items and Categories
+  const activeItems = useMemo(() => {
+    if (!inventory) return [];
+    return inventory.filter(item => item.status === 'Active');
+  }, [inventory]);
+
+  useEffect(() => {
+    const uniqueCats = ['All', ...new Set(activeItems.map(item => item.category).filter(Boolean))];
+    setCategories(uniqueCats);
+  }, [activeItems]);
 
   const filteredItems = useMemo(() => {
-    if (!searchQuery) return items;
-    return items.filter(item =>
-      item.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.itemId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [items, searchQuery]);
+    return activeItems.filter(item => {
+      const matchesSearch = item.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.itemId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.category && item.category.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [activeItems, searchQuery, activeCategory]);
 
   // Cart Operations
   const handleUpdateCart = (item, delta) => {
@@ -63,12 +85,16 @@ export default function QuickTakeoutScreen({ navigation }) {
       const existingItem = prevCart.find(c => c.itemId === item.itemId);
       const currentQty = existingItem ? existingItem.cartQty : 0;
       const newQty = currentQty + delta;
+      const availableStock = parseInt(item.openingStock, 10) || 0;
 
-      // Ensure we don't exceed stock or drop below 0
-      if (newQty > item.openingStock) {
-        Alert.alert("Stock Limit", `Only ${item.openingStock} available.`);
+      // Ensure we don't exceed stock
+      if (newQty > availableStock) {
+        UniversalAlert.alert("Stock Limit", `Only ${availableStock} available.`);
+        HapticHelper.error();
         return prevCart;
       }
+
+      // Ensure we don't drop below 0
       if (newQty <= 0) {
         return prevCart.filter(c => c.itemId !== item.itemId);
       }
@@ -81,14 +107,38 @@ export default function QuickTakeoutScreen({ navigation }) {
     });
   };
 
+  const clearCart = () => {
+    setCart([]);
+    setReason('');
+    setCartModalVisible(false);
+    HapticHelper.success();
+  };
+
+  const confirmClearCart = () => {
+    UniversalAlert.alert(
+      "Clear Cart",
+      "Are you sure you want to remove all items from your takeout?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Clear All", style: "destructive", onPress: clearCart }
+      ]
+    );
+  };
+
   const cartTotalItems = cart.reduce((sum, item) => sum + item.cartQty, 0);
 
   // Checkout Operations
   const submitTakeout = async () => {
-    if (cart.length === 0) return Alert.alert("Empty Cart", "Please add items before checking out.");
-    if (!reason.trim()) return Alert.alert("Validation", "Please enter an urgent reason for this takeout.");
+    if (cart.length === 0) {
+      HapticHelper.error();
+      return UniversalAlert.alert("Empty Cart", "Please add items before checking out.");
+    }
+    if (!reason.trim()) {
+      HapticHelper.error();
+      return UniversalAlert.alert("Validation", "Please enter an urgent reason for this takeout.");
+    }
 
-    setIsLoading(true);
+    setIsSubmitting(true);
     let successCount = 0;
 
     try {
@@ -101,7 +151,7 @@ export default function QuickTakeoutScreen({ navigation }) {
           issuedBy: userData?.name || 'Quick Takeout',
           issuedTo: userData?.name || 'Self (TL)',
           purpose: `[URGENT] ${reason.trim()}`,
-          isReturnable: 'No', 
+          isReturnable: 'No',
           dueDate: '',
           remarks: 'Quick Takeout Cart Checkout'
         };
@@ -111,58 +161,107 @@ export default function QuickTakeoutScreen({ navigation }) {
       }
 
       if (successCount > 0) {
-        Alert.alert("Success", `${successCount} item(s) processed successfully.`);
-        await StorageService.removeCachedData('getInventory');
-        await StorageService.removeCachedData('getDashboard');
-        navigation.goBack();
+        HapticHelper.success();
+        UniversalAlert.alert(
+          "Success",
+          `${successCount} item(s) processed successfully.`,
+          [{
+            text: "OK",
+            onPress: async () => {
+              await StorageService.removeCachedData('getInventory');
+              await StorageService.removeCachedData('getDashboard');
+              clearCart();
+              navigation.goBack();
+            }
+          }]
+        );
       } else {
-        Alert.alert("Error", "Failed to process takeout. Please try again.");
+        HapticHelper.error();
+        UniversalAlert.alert("Error", "Failed to process takeout. Please try again.");
       }
     } catch (error) {
-      Alert.alert("Error", "Network error occurred.");
+      HapticHelper.error();
+      UniversalAlert.alert("Error", "Network error occurred.");
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  // Render Helpers
-  const renderItem = ({ item }) => {
-    const isOutOfStock = item.openingStock <= 0;
+  // UI COMPONENTS
+
+  if (showNotice) {
+    return (
+      <BlurView style={styles.noticeContainer}>
+        <View style={styles.noticeCard}>
+          <View style={styles.noticeIconContainer}>
+            <Ionicons name="warning" size={48} color={theme.warning} />
+          </View>
+          <Text style={styles.noticeTitle}>Emergency Use Only</Text>
+          <View style={styles.noticeBodyContainer}>
+            <Text style={styles.noticeText}>
+              1. This feature is strictly reserved for emergency situations and hospitality purposes.
+            </Text>
+            <Text style={styles.noticeText}>
+              2. For high-urgency cases, you must inform an Operations Volunteer or obtain explicit permission prior to use.
+            </Text>
+            <Text style={styles.noticeTextBold}>
+              3. If you are unsure how to operate this system, do not proceed. Seek immediate assistance from authorized personnel.
+            </Text>
+            <Text style={styles.noticeSignoff}>
+              Regards,{'\n'}Operations Committee
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.noticeButton} onPress={() => setShowNotice(false)}>
+            <Text style={styles.noticeButtonText}>I Understand & Agree</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.noticeCancelButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.noticeCancelText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </BlurView>
+    );
+  }
+
+  const renderItemCard = ({ item }) => {
+    const availableStock = parseInt(item.openingStock, 10) || 0;
+    const isOutOfStock = availableStock <= 0;
     const cartItem = cart.find(c => c.itemId === item.itemId);
     const cartQty = cartItem ? cartItem.cartQty : 0;
+    const isMaxStock = cartQty >= availableStock;
+    const image = item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/caps_logo.png');
 
     return (
       <View style={[styles.itemCard, isOutOfStock && { opacity: 0.5 }]}>
-        <View style={styles.iconPlaceholder}>
-          <Image
-            source={item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/caps_logo.png')}
-            style={{ width: '100%', height: '100%', borderRadius: 8 }}
-          />
-        </View>
-        <View style={styles.itemContent}>
+        <Image source={image} style={styles.itemImage} />
+        <View style={styles.itemDetails}>
           <Text style={styles.itemName} numberOfLines={1}>{item.itemName}</Text>
-          <Text style={styles.itemSub}>{item.location} • {item.rack} | {item.openingStock} {item.unit} available</Text>
+          <Text style={styles.itemSub}>{item.category} • {item.location} | {item.rack}</Text>
+          <Text style={styles.itemStock}>Stock: {item.openingStock}</Text>
         </View>
-        
-        {/* Add / Adjust Cart Quantity Controls */}
-        <View style={styles.itemTrailing}>
+
+        <View style={styles.qtyContainer}>
           {cartQty > 0 ? (
-            <View style={styles.qtyContainer}>
-              <TouchableOpacity onPress={() => handleUpdateCart(item, -1)} style={styles.qtyBtn}>
-                <Ionicons name="remove" size={16} color={theme.text} />
+            <>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => handleUpdateCart(item, -1)}>
+                <Ionicons name="remove" size={18} color={theme.text} />
               </TouchableOpacity>
               <Text style={styles.qtyText}>{cartQty}</Text>
-              <TouchableOpacity onPress={() => handleUpdateCart(item, 1)} style={styles.qtyBtn}>
-                <Ionicons name="add" size={16} color={theme.text} />
+              <TouchableOpacity
+                style={[styles.qtyBtn, isMaxStock && { opacity: 0.3 }]}
+                onPress={() => handleUpdateCart(item, 1)}
+                disabled={isMaxStock}
+              >
+                <Ionicons name="add" size={18} color={theme.text} />
               </TouchableOpacity>
-            </View>
+            </>
           ) : (
-            <TouchableOpacity 
-              style={[styles.addButton, isOutOfStock && { backgroundColor: theme.border }]} 
+            <TouchableOpacity
+              style={[styles.addBtn, isOutOfStock && { opacity: 0.5 }]}
               onPress={() => handleUpdateCart(item, 1)}
               disabled={isOutOfStock}
             >
-              <Text style={styles.addButtonText}>Add</Text>
+              <Ionicons name="add" size={18} color={theme.primary} />
+              <Text style={styles.addBtnText}>Add</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -171,146 +270,253 @@ export default function QuickTakeoutScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
-      <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => step === 2 ? setStep(1) : navigation.goBack()}>
+    <SafeAreaView style={[styles.container, { paddingBottom: 0 }]} edges={['top', 'left', 'right']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => {
+          setCartModalVisible(false);
+          setShowNotice(true);
+          navigation.goBack()
+        }
+        }>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{step === 1 ? 'Quick Takeout' : 'Cart Summary'}</Text>
-        <View style={{ width: 24 }} />
+        <View>
+          <Text style={styles.headerTitle}>Quick Takeout</Text>
+          <Text style={styles.headerSub}>Urgent & Hospitality Only</Text>
+        </View>
       </View>
 
-      {step === 1 ? (
-        // STEP 1: CATALOG & CART SELECTION
-        <View style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: 16 }}>
-            <View style={styles.searchContainer}>
-              <Ionicons name="search" size={20} color={theme.textMuted} style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search by name or ID..."
-                placeholderTextColor={theme.textMuted}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
-          </View>
-
-          <FlatList
-            data={filteredItems}
-            keyExtractor={item => item.itemId}
-            renderItem={renderItem}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
-            ListEmptyComponent={<Text style={styles.emptyText}>No items found.</Text>}
+      {/* Search & Categories */}
+      <View style={styles.filterSection}>
+        <View style={styles.searchBox}>
+          <Ionicons name="search" size={20} color={theme.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search items by name or ID..."
+            placeholderTextColor={theme.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
-
-          {/* Floating Cart Summary */}
-          {cartTotalItems > 0 && (
-            <View style={styles.floatingCartContainer}>
-              <View>
-                <Text style={styles.cartTotalText}>{cartTotalItems} Item(s) Selected</Text>
-                <Text style={styles.cartSubText}>Ready for checkout</Text>
-              </View>
-              <TouchableOpacity style={styles.checkoutBtn} onPress={() => setStep(2)}>
-                <Text style={styles.checkoutBtnText}>Review</Text>
-                <Ionicons name="arrow-forward" size={18} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
+
+        <View style={styles.categoryWrapper}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={categories}
+            keyExtractor={item => item}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.categoryChip, activeCategory === item && styles.categoryChipActive]}
+                onPress={() => setActiveCategory(item)}
+              >
+                <Text style={[styles.categoryChipText, activeCategory === item && styles.categoryChipTextActive]}>
+                  {item}
+                </Text>
+              </TouchableOpacity>
+            )}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+          />
+        </View>
+      </View>
+
+      {/* Item List */}
+      {loading ? (
+        <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 40 }} />
       ) : (
-        // STEP 2: CART SUMMARY & REASON
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }}>
-            
-            <Text style={styles.sectionTitle}>Items in Cart</Text>
-            {cart.map(item => (
-              <View key={item.itemId} style={styles.cartItemRow}>
-                <Text style={styles.cartItemName} numberOfLines={1}>{item.itemName}</Text>
-                <Text style={styles.cartItemQty}>x{item.cartQty}</Text>
+        <FlatList
+          data={filteredItems}
+          keyExtractor={item => item.itemId}
+          renderItem={renderItemCard}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={<Text style={styles.emptyText}>No active items found.</Text>}
+        />
+      )}
+
+      {/* Floating Cart Button */}
+      {cartTotalItems > 0 && (
+        <View style={styles.floatingCartContainer}>
+          <TouchableOpacity style={styles.floatingCartBtn} onPress={() => setCartModalVisible(true)}>
+            <View style={styles.cartIconWrapper}>
+              <Ionicons name="cart" size={24} color="#FFF" />
+              <View style={styles.cartBadge}><Text style={styles.cartBadgeText}>{cart.length}</Text></View>
+            </View>
+            <Text style={styles.floatingCartText}>Review Takeout</Text>
+            <Ionicons name="chevron-forward" size={20} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* CART REVIEW MODAL */}
+      <Modal visible={cartModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Takeout Summary</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                {cartTotalItems > 0 && (
+                  <TouchableOpacity onPress={confirmClearCart}>
+                    <Text style={{ color: theme.danger, fontWeight: '600', fontSize: 14 }}>Clear All</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={styles.closeButton} onPress={() => setCartModalVisible(false)}>
+                  <Ionicons name="close" size={24} color={theme.textMuted} />
+                </TouchableOpacity>
               </View>
-            ))}
-
-            <View style={styles.divider} />
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Reason for Urgent Takeout *</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Why do you need this immediately?"
-                placeholderTextColor={theme.textMuted}
-                multiline={true}
-                numberOfLines={4}
-                value={reason}
-                onChangeText={setReason}
-              />
-              <Text style={styles.helperText}>This will be recorded without prior admin approval.</Text>
             </View>
 
-            <TouchableOpacity
-              style={[styles.primaryButton, isLoading && { opacity: 0.7 }, { marginTop: 20 }]}
-              onPress={submitTakeout}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" />
+            <ScrollView contentContainerStyle={styles.cartList}>
+              {cart.length === 0 ? (
+                <Text style={styles.emptyCartText}>No items added to takeout.</Text>
               ) : (
-                <Text style={styles.primaryButtonText}>Confirm Takeout</Text>
-              )}
-            </TouchableOpacity>
+                cart.map(item => {
+                  const availableStock = parseInt(item.openingStock, 10) || 0;
+                  const isMaxStock = item.cartQty >= availableStock;
 
-          </ScrollView>
-        </KeyboardAvoidingView>
-      )}
+                  return (
+                    <View key={item.itemId} style={styles.cartItem}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.cartItemName}>{item.itemName}</Text>
+                        <Text style={styles.cartItemSub}>ID: {item.itemId}</Text>
+                      </View>
+                      <View style={styles.qtyContainer}>
+                        <TouchableOpacity style={styles.qtyBtn} onPress={() => handleUpdateCart(item, -1)}>
+                          <Ionicons name="remove" size={18} color={theme.text} />
+                        </TouchableOpacity>
+                        <Text style={styles.qtyText}>{item.cartQty}</Text>
+                        <TouchableOpacity
+                          style={[styles.qtyBtn, isMaxStock && { opacity: 0.3 }]}
+                          onPress={() => handleUpdateCart(item, 1)}
+                          disabled={isMaxStock}
+                        >
+                          <Ionicons name="add" size={18} color={theme.text} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )
+                })
+              )}
+
+              {/* Reason Input integrated into Cart Modal */}
+              {cart.length > 0 && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Reason for Urgent Takeout *</Text>
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    placeholder="Why do you need this immediately?"
+                    placeholderTextColor={theme.textMuted}
+                    multiline={true}
+                    numberOfLines={4}
+                    value={reason}
+                    onChangeText={setReason}
+                  />
+                  <Text style={styles.helperText}>This will be recorded without prior admin approval.</Text>
+                </View>
+              )}
+              <View style={{ height: 40 }} />
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              {isSubmitting ? (
+                <ActivityIndicator size="large" color={theme.primary} />
+              ) : (
+                <TouchableOpacity
+                  style={[styles.submitBtn, cartTotalItems === 0 && { opacity: 0.5 }]}
+                  onPress={submitTakeout}
+                  disabled={cartTotalItems === 0}
+                >
+                  <Ionicons name="flash" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.submitBtnText}>Confirm Takeout</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
+
     </SafeAreaView>
   );
 }
 
 const getStyles = (theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },
-  headerTitle: { color: theme.text, fontSize: 20, fontWeight: 'bold' },
 
-  // Search & List Styles
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 12, paddingHorizontal: 12, marginBottom: 16 },
-  searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, color: theme.text, height: 48, fontSize: 15 },
+  // Notice Screen Styles
+  noticeContainer: { flex: 1, backgroundColor: theme.background, justifyContent: 'center', padding: 20 },
+  noticeCard: { backgroundColor: theme.card, borderRadius: 24, padding: 30, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10, borderWidth: 1, borderColor: theme.border },
+  noticeIconContainer: { width: 80, height: 80, borderRadius: 40, backgroundColor: theme.warning + '20', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  noticeTitle: { fontSize: 22, fontWeight: 'bold', color: theme.text, marginBottom: 16, textAlign: 'center' },
+  noticeBodyContainer: { backgroundColor: theme.inputBg, padding: 20, borderRadius: 16, marginBottom: 24, width: '100%' },
+  noticeText: { fontSize: 14, color: theme.text, marginBottom: 12, lineHeight: 22, textAlign: 'left' },
+  noticeTextBold: { fontSize: 14, color: theme.danger, fontWeight: 'bold', marginBottom: 16, lineHeight: 22, textAlign: 'left' },
+  noticeSignoff: { fontSize: 14, color: theme.textMuted, fontWeight: '600', textAlign: 'left', fontStyle: 'italic' },
+  noticeButton: { backgroundColor: theme.primary, width: '100%', paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginBottom: 12 },
+  noticeButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+  noticeCancelButton: { paddingVertical: 12, width: '100%', alignItems: 'center' },
+  noticeCancelText: { color: theme.textMuted, fontSize: 15, fontWeight: '600' },
+
+  // Header
+  header: { flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 10 },
+  backBtn: { marginRight: 16, padding: 4 },
+  headerTitle: { color: theme.text, fontSize: 24, fontWeight: 'bold' },
+  headerSub: { color: theme.warning, fontSize: 13, marginTop: 2, fontWeight: '600' },
+
+  // Search & Filter (From RequestItemScreen)
+  filterSection: { borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: 16 },
+  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, marginHorizontal: 16, paddingHorizontal: 16, height: 48, borderRadius: 12, borderWidth: 1, borderColor: theme.border, marginBottom: 16 },
+  searchInput: { flex: 1, color: theme.text, marginLeft: 10, fontSize: 15 },
+  categoryWrapper: { height: 36 },
+  categoryChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: theme.inputBg, borderWidth: 1, borderColor: theme.border },
+  categoryChipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+  categoryChipText: { color: theme.textMuted, fontWeight: '600', fontSize: 13 },
+  categoryChipTextActive: { color: '#FFF' },
   emptyText: { color: theme.textMuted, textAlign: 'center', marginTop: 40 },
 
-  itemCard: { flexDirection: 'row', backgroundColor: theme.card, padding: 12, borderRadius: 12, marginBottom: 12, alignItems: 'center' },
-  iconPlaceholder: { width: 50, height: 50, borderRadius: 8, backgroundColor: theme.inputBg, marginRight: 12 },
-  itemContent: { flex: 1 },
-  itemName: { color: theme.text, fontSize: 16, fontWeight: '600', marginBottom: 4 },
-  itemSub: { color: theme.textMuted, fontSize: 13 },
-  itemTrailing: { alignItems: 'flex-end', justifyContent: 'center' },
+  // List (From RequestItemScreen)
+  listContent: { padding: 16, paddingBottom: 100 },
+  itemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.card, padding: 12, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: theme.border },
+  itemImage: { width: 70, height: 70, borderRadius: 12, backgroundColor: theme.inputBg },
+  itemDetails: { flex: 1, marginLeft: 12 },
+  itemName: { color: theme.text, fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  itemSub: { color: theme.textMuted, fontSize: 12, marginBottom: 4 },
+  itemStock: { color: theme.success, fontSize: 12, fontWeight: '600' },
 
-  // Cart Controls
-  addButton: { backgroundColor: theme.primary + '30', paddingVertical: 6, paddingHorizontal: 16, borderRadius: 8 },
-  addButtonText: { color: theme.primary, fontWeight: 'bold', fontSize: 13 },
-  qtyContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 8, paddingHorizontal: 4, paddingVertical: 4 },
-  qtyBtn: { padding: 4, backgroundColor: theme.border, borderRadius: 6 },
-  qtyText: { color: theme.text, marginHorizontal: 12, fontWeight: 'bold', fontSize: 16 },
+  // Qty Controls (From RequestItemScreen)
+  qtyContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 8, borderWidth: 1, borderColor: theme.border },
+  qtyBtn: { padding: 8, paddingHorizontal: 12 },
+  qtyText: { color: theme.text, fontWeight: 'bold', fontSize: 16, minWidth: 20, textAlign: 'center' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.primary + '15', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, borderColor: theme.primary + '50' },
+  addBtnText: { color: theme.primary, fontWeight: 'bold', marginLeft: 4 },
 
-  // Floating Cart
-  floatingCartContainer: { position: 'absolute', bottom: 20, left: 16, right: 16, backgroundColor: theme.primary, borderRadius: 16, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4 },
-  cartTotalText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  cartSubText: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 },
-  checkoutBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
-  checkoutBtnText: { color: '#fff', fontWeight: 'bold', marginRight: 6 },
+  // Floating Cart (From RequestItemScreen)
+  floatingCartContainer: { position: 'absolute', bottom: 20, left: 16, right: 16 },
+  floatingCartBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.primary, padding: 16, borderRadius: 16, shadowColor: theme.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
+  cartIconWrapper: { position: 'relative', marginRight: 12 },
+  cartBadge: { position: 'absolute', top: -6, right: -10, backgroundColor: theme.danger, width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: theme.primary },
+  cartBadgeText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
+  floatingCartText: { flex: 1, color: '#FFF', fontSize: 16, fontWeight: 'bold' },
 
-  // Checkout Styles
-  sectionTitle: { color: theme.textMuted, fontSize: 14, textTransform: 'uppercase', marginBottom: 12, fontWeight: '600' },
-  cartItemRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: theme.card, padding: 16, borderRadius: 12, marginBottom: 8 },
-  cartItemName: { color: theme.text, fontSize: 15, fontWeight: '500', flex: 1, paddingRight: 10 },
-  cartItemQty: { color: theme.primary, fontSize: 15, fontWeight: 'bold' },
-  divider: { height: 1, backgroundColor: theme.border, marginVertical: 24 },
-  
-  inputGroup: { marginBottom: 16 },
+  // Modal (Cart Review - From RequestItemScreen)
+  modalContainer: { flex: 1, backgroundColor: theme.background },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: theme.border, backgroundColor: theme.card },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: theme.text },
+  closeButton: { padding: 4, backgroundColor: theme.inputBg, borderRadius: 20 },
+  cartList: { padding: 16 },
+  emptyCartText: { color: theme.textMuted, textAlign: 'center', marginTop: 40, fontSize: 16 },
+  cartItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.card, padding: 16, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: theme.border },
+  cartItemName: { color: theme.text, fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  cartItemSub: { color: theme.textMuted, fontSize: 13 },
+
+  // Checkout Input fields for Reason
+  inputGroup: { marginTop: 16, paddingHorizontal: 16 },
   inputLabel: { color: theme.text, fontSize: 14, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
-  input: { backgroundColor: theme.inputBg, color: theme.text, borderRadius: 12, paddingHorizontal: 16, height: 52, fontSize: 15 },
+  input: { backgroundColor: theme.inputBg, color: theme.text, borderRadius: 12, paddingHorizontal: 16, height: 52, fontSize: 15, borderWidth: 1, borderColor: theme.border },
   textArea: { height: 100, paddingTop: 14, textAlignVertical: 'top' },
   helperText: { color: theme.warning, fontSize: 12, marginTop: 8, marginLeft: 4, fontStyle: 'italic' },
 
-  primaryButton: { backgroundColor: theme.primary, paddingVertical: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  modalFooter: { padding: 20, backgroundColor: theme.card, borderTopWidth: 1, borderTopColor: theme.border },
+  submitBtn: { flexDirection: 'row', backgroundColor: theme.success, padding: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  submitBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' }
 });

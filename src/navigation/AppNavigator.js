@@ -90,7 +90,7 @@ export default function AppNavigator() {
   const [userToken, setUserToken] = useState(null);
   const [userData, setUserData] = useState(null); 
   
-  const { theme } = useTheme(); // <-- Grab dynamic colors for Loading Screen
+  const { theme } = useTheme(); // Grab dynamic colors for Loading Screen
 
   // Check for existing login on app start
   useEffect(() => {

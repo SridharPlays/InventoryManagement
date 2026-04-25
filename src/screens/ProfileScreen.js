@@ -1,29 +1,35 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRef, useState } from 'react';
-import { Alert, Image, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, Platform } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+// Add these to your imports at the top
+import * as ImagePicker from 'expo-image-picker';
+import { postToGAS } from '../services/api';
 
 import { Audio } from 'expo-av';
+import { BlurView } from 'expo-blur';
 import { useNavigation } from 'expo-router';
 import { CAPS_APPS } from '../constants/apps';
 import { useTheme } from '../context/ThemeContext';
 import { StorageService } from '../services/storage';
+import { HapticHelper } from '../utils/haptics';
+import { UniversalAlert } from '../utils/UniversalAlert';
 
 export default function ProfileScreen({ userData, setToken }) {
   const { theme, isDarkMode, toggleTheme } = useTheme();
   const styles = getStyles(theme);
 
-  const [contactModalVisible, setContactModalVisible] = useState(false);
+  const [vibrationsEnabled, setVibrationsEnabled] = useState(true);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
-  const [preferencesModalVisible, setPreferencesModalVisible] = useState(false);
   const [appsModalVisible, setAppsModalVisible] = useState(false);
+
+  const [isUploading, setIsUploading] = useState(false);
+  const [profileImage, setProfileImage] = useState(userData?.profileImage || null);
 
   const [tapCount, setTapCount] = useState(0);
   const [soundIndex, setSoundIndex] = useState(0);
   const soundRef = useRef(null);
-
-  const [mailEnabled, setMailEnabled] = useState(true);
 
   const navigate = useNavigation();
 
@@ -32,6 +38,38 @@ export default function ProfileScreen({ userData, setToken }) {
     require('../../assets/faaah.mp3'),
     require('../../assets/getout.mp3'),
   ];
+
+  useEffect(() => {
+    const loadVibrationSettings = async () => {
+      try {
+        const storedValue = await StorageService.getCachedData('vibrationsEnabled');
+        if (storedValue !== null && storedValue !== undefined) {
+          setVibrationsEnabled(storedValue);
+          HapticHelper.setHapticsEnabled(storedValue); // Sync the helper
+        }
+      } catch (error) {
+        console.error("Failed to load vibration settings:", error);
+      }
+    };
+    loadVibrationSettings();
+  }, []);
+
+  const toggleVibrations = async () => {
+    const newValue = !vibrationsEnabled;
+    setVibrationsEnabled(newValue);
+    HapticHelper.setHapticsEnabled(newValue); // Instantly update helper
+
+    // Provide haptic feedback if turning ON
+    if (newValue && Platform.OS !== 'web') {
+      await HapticHelper.success();
+    }
+
+    try {
+      await StorageService.cacheData('vibrationsEnabled', newValue);
+    } catch (error) {
+      console.error("Failed to save vibration preference:", error);
+    }
+  };
 
   const playNextSound = async () => {
     const { sound } = await Audio.Sound.createAsync(soundsList[soundIndex]);
@@ -43,7 +81,7 @@ export default function ProfileScreen({ userData, setToken }) {
   const handlePress = () => {
     const newCount = tapCount + 1;
     setTapCount(newCount);
-    if (newCount === 20) {
+    if (newCount === 10) {
       playNextSound();
       setTapCount(0);
     }
@@ -53,6 +91,68 @@ export default function ProfileScreen({ userData, setToken }) {
     if (a.isDraft === b.isDraft) return 0;
     return a.isDraft ? 1 : -1;
   });
+
+  const handleUpdateProfilePic = async () => {
+    try {
+      // Ask for permission
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permissionResult.granted === false) {
+        UniversalAlert.alert("Permission Required", "Please allow access to your photos to change your profile picture.");
+        return;
+      }
+
+      // Launch Image Library
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+        base64: true,
+      });
+
+      if (!result.canceled) {
+        setIsUploading(true);
+        const base64 = result.assets[0].base64;
+        const uri = result.assets[0].uri;
+        const extension = uri.split('.').pop() || 'jpg';
+        const mimeType = result.assets[0].mimeType || `image/${extension}`;
+
+        // Send to Google Apps Script using your helper
+        const data = await postToGAS('updateProfileImage', {
+          email: userData.email,
+          fileObject: {
+            base64: base64,
+            type: mimeType,
+            name: `profile_${userData.id}_${Date.now()}.${extension}`
+          }
+        });
+
+        // Handle Response
+        if (data && data.success) {
+          setProfileImage(data.imageUrl);
+
+          // Update local storage so it persists on app reload
+          const updatedUser = { ...userData, profileImage: data.imageUrl };
+          await AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
+
+          const { sound } = await Audio.Sound.createAsync(soundsList[0]);
+          soundRef.current = sound;
+          await sound.playAsync();
+
+          HapticHelper.success();
+          UniversalAlert.alert("Success", "Profile picture updated!");
+        } else {
+          HapticHelper.error();
+          UniversalAlert.alert("Error", data?.message || "Failed to update profile picture.");
+        }
+      }
+    } catch (error) {
+      console.error("Profile Pic Upload Error:", error);
+      UniversalAlert.alert("Error", "Something went wrong while uploading.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleLogout = async () => {
     if (Platform.OS === 'web') {
@@ -64,12 +164,13 @@ export default function ProfileScreen({ userData, setToken }) {
         setToken(null);
       }
     } else {
-      Alert.alert("Log Out", "Are you sure you want to log out?", [
+      UniversalAlert.alert("Log Out", "Are you sure you want to log out?", [
         { text: "Cancel", style: "cancel" },
         {
           text: "Log Out",
           style: "destructive",
           onPress: async () => {
+            HapticHelper.success();
             await AsyncStorage.removeItem('userToken');
             await AsyncStorage.removeItem('userData');
             await StorageService.clearSession();
@@ -81,7 +182,7 @@ export default function ProfileScreen({ userData, setToken }) {
   };
 
   const handleClearCache = async () => {
-    Alert.alert("Clear Cache", "Are you sure you want to clear the locally stored inventory data?", [
+    UniversalAlert.alert("Clear Cache", "Are you sure you want to clear the locally stored inventory data?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Clear",
@@ -89,19 +190,16 @@ export default function ProfileScreen({ userData, setToken }) {
         onPress: async () => {
           try {
             await StorageService.removeCachedData('getInventory');
-            Alert.alert("Success", "Inventory cache has been cleared.");
+            await HapticHelper.success();
+            UniversalAlert.alert("Success", "Inventory cache has been cleared.");
           } catch (error) {
             console.error("Failed to clear cache:", error);
-            Alert.alert("Error", "Could not clear the cached data.");
+            await HapticHelper.error();
+            UniversalAlert.alert("Error", "Could not clear the cached data.");
           }
         }
       }
     ]);
-  };
-
-  const handleSavePreferences = () => {
-    Alert.alert("Preferences Saved", `Mail Notifications are now ${mailEnabled ? 'ON' : 'OFF'}`);
-    setPreferencesModalVisible(false);
   };
 
   const ProfileItem = ({ icon, label, value, onPress, rightIcon = "chevron-forward" }) => (
@@ -126,15 +224,34 @@ export default function ProfileScreen({ userData, setToken }) {
           <Text style={styles.headerTitle}>Profile</Text>
         </View>
 
-        <TouchableOpacity style={styles.userCard} onPress={handlePress}>
-          <View style={styles.avatarPlaceholder}>
-            <Image source={require('../../assets/images/caps_logo.png')} style={styles.avatar} />
-          </View>
-          <View style={styles.userInfo}>
+        <View style={styles.userCard}>
+          {/* Avatar Area - Triggers Image Picker */}
+          <TouchableOpacity
+            style={styles.avatarPlaceholder}
+            onPress={handleUpdateProfilePic}
+            disabled={isUploading}
+          >
+            {isUploading ? (
+              <ActivityIndicator size="small" color={theme.primary} />
+            ) : (
+              <>
+                <Image
+                  source={profileImage ? { uri: profileImage } : require('../../assets/images/caps_logo.png')}
+                  style={styles.avatar}
+                />
+                <View style={styles.editIconBadge}>
+                  <Ionicons name="camera" size={12} color="#fff" />
+                </View>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {/* User Info Area - Triggers the Easter Egg (handlePress) */}
+          <TouchableOpacity style={styles.userInfo} onPress={handlePress} activeOpacity={0.7}>
             <Text style={styles.userName}>{userData?.name || 'Guest User'}</Text>
             <Text style={styles.userEmail}>{userData?.email || 'No email found'}</Text>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
 
         <Text style={styles.sectionTitle}>About</Text>
         <View style={styles.cardGroup}>
@@ -145,11 +262,9 @@ export default function ProfileScreen({ userData, setToken }) {
 
         <Text style={styles.sectionTitle}>App</Text>
         <View style={styles.cardGroup}>
-          <ProfileItem icon="card-account-mail-outline" label="Contact us" onPress={() => setContactModalVisible(true)} />
-          <View style={styles.itemDivider} />
           <ProfileItem icon="help-circle-outline" label="Help & Support" onPress={() => setHelpModalVisible(true)} />
           <View style={styles.itemDivider} />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 }}>
+          <View style={styles.profileItem}>
             <View style={styles.profileItemLeft}>
               <View style={styles.iconBox}>
                 <MaterialCommunityIcons name={"palette"} size={20} color={theme.text} />
@@ -158,9 +273,26 @@ export default function ProfileScreen({ userData, setToken }) {
             </View>
             <Switch
               trackColor={{ false: theme.border, true: theme.primary }}
-              thumbColor={theme.primary}
+              thumbColor={'#f4f3f4'}
+              ios_backgroundColor="#3e3e3e"
               onValueChange={toggleTheme}
               value={isDarkMode}
+            />
+          </View>
+          <View style={styles.itemDivider} />
+          <View style={styles.profileItem}>
+            <View style={styles.profileItemLeft}>
+              <View style={styles.iconBox}>
+                <MaterialCommunityIcons name={"vibrate"} size={20} color={theme.text} />
+              </View>
+              <Text style={styles.profileItemLabel}>Vibrations</Text>
+            </View>
+            <Switch
+              trackColor={{ false: theme.border, true: theme.primary }}
+              thumbColor={'#f4f3f4'}
+              ios_backgroundColor="#3e3e3e"
+              onValueChange={toggleVibrations} // Use new handler
+              value={vibrationsEnabled}        // Use new state
             />
           </View>
           <View style={styles.itemDivider} />
@@ -188,49 +320,9 @@ export default function ProfileScreen({ userData, setToken }) {
         </View>
       </ScrollView>
 
-      {/* Preferences Modal */}
-      <Modal animationType="fade" transparent={true} visible={preferencesModalVisible} onRequestClose={() => setPreferencesModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>User Preferences</Text>
-            <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Mail Notifications</Text>
-              <Switch
-                trackColor={{ false: theme.border, true: theme.primary }}
-                thumbColor={'#f4f3f4'}
-                ios_backgroundColor="#3e3e3e"
-                onValueChange={setMailEnabled}
-                value={mailEnabled}
-              />
-            </View>
-            <View style={styles.modalActionRow}>
-              <TouchableOpacity style={[styles.modalButtonBase, styles.modalButtonCancel]} onPress={() => setPreferencesModalVisible(false)}>
-                <Text style={styles.modalButtonCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButtonBase, styles.modalButtonPrimary]} onPress={handleSavePreferences}>
-                <Text style={styles.modalButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Contact Us Modal */}
-      <Modal animationType="fade" transparent={true} visible={contactModalVisible} onRequestClose={() => setContactModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Contact Us</Text>
-            <Text style={styles.modalText}>You can reach us at caps@christuniversity.in</Text>
-            <TouchableOpacity style={styles.modalButton} onPress={() => setContactModalVisible(false)}>
-              <Text style={styles.modalButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
       {/* Help & Support Modal */}
       <Modal animationType="fade" transparent={true} visible={helpModalVisible} onRequestClose={() => setHelpModalVisible(false)}>
-        <View style={styles.modalOverlay}>
+        <BlurView intensity={50} style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Help & Support</Text>
             <Text style={styles.modalText}>Need assistance? Contact your Team Lead or Administrator.</Text>
@@ -238,7 +330,7 @@ export default function ProfileScreen({ userData, setToken }) {
               <Text style={styles.modalButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </BlurView>
       </Modal>
 
       {/* Bottom Sheet Modal for More Applications */}
@@ -269,11 +361,12 @@ export default function ProfileScreen({ userData, setToken }) {
                 <TouchableOpacity
                   key={app.id}
                   style={[styles.appCard, app.isDraft && styles.appCardDraft]}
-                  activeOpacity={app.isDraft ? 1 : 0.7}
+                  activeOpacity={app.isDraft && userData?.role === 'admin' ? 1 : 0.7}
                   onPress={() => {
                     if (!app.isDraft && userData?.role === 'admin') {
                       setAppsModalVisible(false);
                       navigate.navigate(app.redirectTo);
+                    } else {
                     }
                   }}
                 >
@@ -298,7 +391,7 @@ export default function ProfileScreen({ userData, setToken }) {
 
                   <TouchableOpacity
                     style={[styles.openBtn, app.isDraft && { backgroundColor: theme.border }]}
-                    disabled={app.isDraft && userData?.role === 'admin'}
+                    disabled={app.isDraft && userData?.role !== 'admin'}
                     onPress={() => {
                       if (!app.isDraft && userData?.role === 'admin') {
                         setAppsModalVisible(false);
@@ -308,9 +401,9 @@ export default function ProfileScreen({ userData, setToken }) {
                   >
                     <Text style={[
                       styles.openBtnText,
-                      app.isDraft && { color: theme.textMuted }
+                      app.isDraft && userData?.role === 'admin' && { color: theme.textMuted }
                     ]}>
-                      {app.isDraft ? 'Soon' : 'Open'}
+                      {app.isDraft && userData?.role !== 'admin' ? 'Soon' : 'Open'}
                     </Text>
                   </TouchableOpacity>
                 </TouchableOpacity>
@@ -319,7 +412,7 @@ export default function ProfileScreen({ userData, setToken }) {
           </View>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView>
+    </SafeAreaView >
   );
 }
 
@@ -379,4 +472,17 @@ const getStyles = (theme) => StyleSheet.create({
   draftBadgeText: { fontSize: 10, fontWeight: '600' },
   openBtn: { backgroundColor: `${theme.primary}15`, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20 },
   openBtnText: { color: theme.primary, fontSize: 13, fontWeight: '600' },
+  editIconBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: theme.primary,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: theme.card
+  },
 });

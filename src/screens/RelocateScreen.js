@@ -2,19 +2,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
-    Image, ScrollView,
+    ScrollView,
     StyleSheet,
     Text,
-    TextInput, TouchableOpacity,
+    TextInput,
+    TouchableOpacity,
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
+
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
-
 import { useTheme } from '../context/ThemeContext';
+import { useInventory } from '../hooks/useInventory';
+import { HapticHelper } from '../utils/haptics';
+import { UniversalAlert } from '../utils/UniversalAlert';
 
 // CUSTOM INLINE DROPDOWN COMPONENT (Adapted for Selection)
 const CustomDropdown = ({ label, options, selectedValue, onSelect, placeholder }) => {
@@ -68,7 +72,6 @@ export default function RelocateScreen({ route, navigation }) {
     const { theme } = useTheme();
     const styles = getStyles(theme);
 
-    const [items, setItems] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedIds, setSelectedIds] = useState(initialItemId ? [initialItemId] : []);
 
@@ -78,15 +81,20 @@ export default function RelocateScreen({ route, navigation }) {
     const [newLocation, setNewLocation] = useState('');
     const [newCupboard, setNewCupboard] = useState('');
     const [newRack, setNewRack] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Hook Initialization
+    const { inventory, loading, loadInventory } = useInventory();
 
     useEffect(() => {
-        const loadInventory = async () => {
-            const cached = await StorageService.getCachedData('getInventory') || [];
-            setItems(cached.filter(item => item.status === 'Active'));
-        };
         loadInventory();
-    }, []);
+    }, [loadInventory]);
+
+    // Derive Active Items
+    const items = useMemo(() => {
+        if (!inventory) return [];
+        return inventory.filter(item => item.status === 'Active');
+    }, [inventory]);
 
     // DYNAMIC DROPDOWN OPTIONS
     const uniqueLocations = useMemo(() => {
@@ -130,10 +138,11 @@ export default function RelocateScreen({ route, navigation }) {
 
     const submitRelocation = async () => {
         if (!newLocation && !newCupboard && !newRack) {
-            return Alert.alert("Error", "Please select at least one destination field to update.");
+            HapticHelper.error();
+            return UniversalAlert.alert("Error", "Please select at least one destination field to update.");
         }
 
-        setIsLoading(true);
+        setIsSubmitting(true);
         try {
             const response = await postToGAS('bulkRelocate', {
                 itemIds: selectedIds,
@@ -143,16 +152,25 @@ export default function RelocateScreen({ route, navigation }) {
             });
 
             if (response.success) {
-                Alert.alert("Success", response.message || "Items relocated successfully.");
-                await StorageService.removeCachedData('getInventory');
-                navigation.goBack();
+                HapticHelper.success();
+                UniversalAlert.alert("Success", response.message || "Items relocated successfully.", [
+                    {
+                        text: "OK",
+                        onPress: async () => {
+                            await StorageService.removeCachedData('getInventory');
+                            navigation.goBack();
+                        }
+                    }
+                ]);
             } else {
-                Alert.alert("Error", response.message || "Failed to relocate items.");
+                HapticHelper.error();
+                UniversalAlert.alert("Error", response.message || "Failed to relocate items.");
             }
         } catch (error) {
-            Alert.alert("Error", "Network error occurred.");
+            HapticHelper.error();
+            UniversalAlert.alert("Error", "Network error occurred." + (error.message ? ` (${error.message})` : ""));
         } finally {
-            setIsLoading(false);
+            setIsSubmitting(false);
         }
     };
 
@@ -174,6 +192,7 @@ export default function RelocateScreen({ route, navigation }) {
                     <Image
                         source={item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/caps_logo.png')}
                         style={{ width: '100%', height: '100%', borderRadius: 8 }}
+                        contentFit="cover"
                     />
                 </View>
                 <View style={styles.itemContent}>
@@ -185,7 +204,7 @@ export default function RelocateScreen({ route, navigation }) {
     };
 
     return (
-        <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={[styles.container, { paddingBottom: 0 }]} edges={['top', 'left', 'right']}>
             <View style={styles.headerRow}>
                 <TouchableOpacity onPress={() => step === 2 ? setStep(1) : navigation.goBack()}>
                     <Ionicons name="arrow-back" size={24} color={theme.text} />
@@ -195,7 +214,7 @@ export default function RelocateScreen({ route, navigation }) {
             </View>
 
             {step === 1 ? (
-                // STEP 1: SELECT ITEMS
+                // Select Items
                 <View style={{ flex: 1, paddingHorizontal: 16 }}>
                     <View style={styles.searchContainer}>
                         <Ionicons name="search" size={20} color={theme.textMuted} style={styles.searchIcon} />
@@ -217,12 +236,17 @@ export default function RelocateScreen({ route, navigation }) {
                         </TouchableOpacity>
                     </View>
 
-                    <FlatList
-                        data={filteredItems}
-                        keyExtractor={item => item.itemId}
-                        renderItem={renderItem}
-                        contentContainerStyle={{ paddingBottom: 100 }}
-                    />
+                    {loading ? (
+                        <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 40 }} />
+                    ) : (
+                        <FlatList
+                            data={filteredItems}
+                            keyExtractor={item => item.itemId}
+                            renderItem={renderItem}
+                            contentContainerStyle={{ paddingBottom: 100 }}
+                            ListEmptyComponent={<Text style={styles.emptyText}>No active items found.</Text>}
+                        />
+                    )}
 
                     {selectedIds.length > 0 && (
                         <View style={styles.bottomBar}>
@@ -234,7 +258,7 @@ export default function RelocateScreen({ route, navigation }) {
                     )}
                 </View>
             ) : (
-                // STEP 2: SET DESTINATION
+                // Destination Seletion
                 <ScrollView style={{ flex: 1, padding: 20 }} keyboardShouldPersistTaps="handled">
                     <View style={styles.summaryBox}>
                         <Ionicons name="information-circle" size={24} color={theme.primary} style={{ marginRight: 10 }} />
@@ -269,7 +293,7 @@ export default function RelocateScreen({ route, navigation }) {
                             <Text style={styles.inputLabel}>New Rack</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="e.g., 2"
+                                placeholder="e.g., 2A"
                                 placeholderTextColor={theme.textMuted}
                                 value={newRack}
                                 onChangeText={setNewRack}
@@ -278,11 +302,11 @@ export default function RelocateScreen({ route, navigation }) {
                     </View>
 
                     <TouchableOpacity
-                        style={[styles.primaryButton, isLoading && { opacity: 0.7 }, { marginTop: 20, marginBottom: 40 }]}
+                        style={[styles.primaryButton, isSubmitting && { opacity: 0.7 }, { marginTop: 20, marginBottom: 40 }]}
                         onPress={submitRelocation}
-                        disabled={isLoading}
+                        disabled={isSubmitting}
                     >
-                        {isLoading ? (
+                        {isSubmitting ? (
                             <ActivityIndicator color="#fff" />
                         ) : (
                             <Text style={styles.primaryButtonText}>Confirm Relocation</Text>

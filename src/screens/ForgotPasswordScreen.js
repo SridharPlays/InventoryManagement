@@ -20,8 +20,11 @@ import { StorageService } from '../services/storage';
 
 import { useTheme } from '../context/ThemeContext';
 
+import { UniversalAlert } from '../utils/UniversalAlert';
+import { HapticHelper } from '../utils/haptics';
+
 export default function ForgotPasswordScreen({ navigation, setToken, setUserData }) {
-  const [step, setStep] = useState(1); // 1: Email, 2: Code & New Password
+  const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');

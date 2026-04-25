@@ -13,8 +13,6 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { theme } from '../constants/theme';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 import { useInventory } from '../hooks/useInventory';
@@ -22,6 +20,7 @@ import { UniversalAlert } from '../utils/UniversalAlert';
 import BottomSheetModal from '../components/BottomSheetModal';
 import CustomDropdown from '../components/CustomDropdown';
 import { useTheme } from '../context/ThemeContext';
+import { HapticHelper } from '../utils/haptics';
 
 // Custom hook for debouncing search
 function useDebounce(value, delay) {
@@ -37,7 +36,7 @@ export default function InventoryScreen({ navigation }) {
   const { inventory: items, loading: refreshing, loadInventory } = useInventory();
   const [isGrid, setIsGrid] = useState(false);
 
-  const { theme} = useTheme();
+  const { theme } = useTheme();
   const styles = getStyles(theme);
 
   // FILTER STATES
@@ -57,7 +56,7 @@ export default function InventoryScreen({ navigation }) {
   const [editForm, setEditForm] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => { loadInventory(false); }, [loadInventory]);
+  useEffect(() => { loadInventory(false); HapticHelper.lightImpact(); }, [loadInventory]);
 
   // DYNAMIC OPTIONS GENERATOR
   const uniqueCategories = useMemo(() => Array.from(new Set(items.map(i => i.category).filter(Boolean))).sort(), [items]);
@@ -212,7 +211,7 @@ export default function InventoryScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.headerRow}>
         <Text style={styles.headerTitle}>Inventory</Text>
         <TouchableOpacity onPress={() => setIsGrid(!isGrid)}>

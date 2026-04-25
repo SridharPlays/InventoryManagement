@@ -1,26 +1,29 @@
 import { Ionicons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
-    Image,
     Modal,
     ScrollView,
     StyleSheet,
     Text,
-    TextInput, TouchableOpacity,
+    TextInput,
+    TouchableOpacity,
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme } from '../context/ThemeContext';
+import { useInventory } from '../hooks/useInventory';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
+import { HapticHelper } from '../utils/haptics';
+import { UniversalAlert } from '../utils/UniversalAlert';
 
-export default function StockInScreen() {
+export default function StockInScreen({ navigation }) {
     // Mode State
     const [entryMode, setEntryMode] = useState('restock'); // 'restock' or 'expense'
     const [userName, setUserName] = useState('');
@@ -39,71 +42,61 @@ export default function StockInScreen() {
     const [invoiceImage, setInvoiceImage] = useState(null);
     const [rawBase64, setRawBase64] = useState(null);
 
-    // Inventory Data State
-    const [inventoryList, setInventoryList] = useState([]);
-    const [filteredList, setFilteredList] = useState([]);
+    // System State
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [isFetchingItems, setIsFetchingItems] = useState(false);
-
-    // System State
     const [isLoading, setIsLoading] = useState(false);
     const [isOnline, setIsOnline] = useState(true);
 
-    useEffect(() => async () => {
-        const userSession = await StorageService.getSession();
-        if (userSession) {
-            try {
-                const parsed = JSON.parse(userSession);
-                if (parsed && parsed.name) setUserName(parsed.name);
-            } catch (e) {
-                if (userSession.name) setUserName(userSession.name);
+    // Hook Initialization
+    const { inventory, loading: isFetchingItems, loadInventory } = useInventory();
+
+    useEffect(() => {
+        loadInventory();
+
+        const initUser = async () => {
+            const userSession = await StorageService.getSession();
+            if (userSession) {
+                try {
+                    const parsed = typeof userSession === 'string' ? JSON.parse(userSession) : userSession;
+                    if (parsed && parsed.name) setUserName(parsed.name);
+                } catch (e) {
+                    if (userSession.name) setUserName(userSession.name);
+                }
             }
-        }
+        };
+        initUser();
 
         const unsubscribe = NetInfo.addEventListener(state => {
             setIsOnline(state.isConnected);
             if (state.isConnected) syncOfflineData();
         });
 
-        fetchInventory(); // Fetch items on load
         return () => unsubscribe();
-    }, []);
+    }, [loadInventory]);
 
-    // Getting the stored inventory
-    const fetchInventory = async () => {
-        setIsFetchingItems(true);
-        try {
-            const storedInventory = await StorageService.getCachedData("getInventory");
+    // Derive active items and handle search filtering
+    const activeItems = useMemo(() => {
+        if (!inventory) return [];
+        return inventory.filter(item => item.status === 'Active');
+    }, [inventory]);
 
-            if (storedInventory && Array.isArray(storedInventory)) {
-                setInventoryList(storedInventory);
-                setFilteredList(storedInventory);
-            } else {
-                console.log("No valid inventory array found in local storage.");
-            }
-        } catch (error) {
-            console.log("Failed to load inventory from local storage:", error);
-        }
-        setIsFetchingItems(false);
-    };
-
-    const handleSearch = (text) => {
-        setSearchQuery(text);
-        const filtered = inventoryList.filter(item =>
-            item.itemName.toLowerCase().includes(text.toLowerCase()) ||
-            item.itemId.toLowerCase().includes(text.toLowerCase())
+    const filteredList = useMemo(() => {
+        if (!searchQuery) return activeItems;
+        return activeItems.filter(item =>
+            item.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.itemId.toLowerCase().includes(searchQuery.toLowerCase())
         );
-        setFilteredList(filtered);
-    };
+    }, [activeItems, searchQuery]);
 
-    //--------------------------------------
+    //--
     // UTILITIES (Storage & Images)
-    //--------------------------------------
+    //--
     const pickImage = async () => {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!permissionResult.granted) {
-            Alert.alert("Permission required", "You need to allow camera roll access to upload an invoice.");
+            HapticHelper.error();
+            UniversalAlert.alert("Permission required", "You need to allow camera roll access to upload an invoice.");
             return;
         }
 
@@ -127,7 +120,7 @@ export default function StockInScreen() {
                 await postToGAS('receive', { data: item });
             }
             await StorageService.clearOfflineQueue('stockIn');
-            Alert.alert("Sync Complete", "Your offline stock entries have been synced to the database.");
+            UniversalAlert.alert("Sync Complete", "Your offline stock entries have been synced to the database.");
         }
     };
 
@@ -141,21 +134,24 @@ export default function StockInScreen() {
         setRawBase64(null);
     };
 
-    //--------------------------------------
+    //--
     // SUBMIT LOGIC
-    //--------------------------------------
+    //--
     const handleSubmit = async () => {
         // Validation Guardrails
         if (entryMode === 'restock' && !selectedItem) {
-            Alert.alert("Validation Error", "Please select an item from the inventory.");
+            HapticHelper.error();
+            UniversalAlert.alert("Validation Error", "Please select an item from the inventory.");
             return;
         }
         if (entryMode === 'expense' && !itemName.trim()) {
-            Alert.alert("Validation Error", "Please enter a name for the new item or expense.");
+            HapticHelper.error();
+            UniversalAlert.alert("Validation Error", "Please enter a name for the new item or expense.");
             return;
         }
         if (!price || !quantity) {
-            Alert.alert("Validation Error", "Please fill in Price and Quantity.");
+            HapticHelper.error();
+            UniversalAlert.alert("Validation Error", "Please fill in Price and Quantity.");
             return;
         }
 
@@ -174,7 +170,8 @@ export default function StockInScreen() {
                     if (imageRes && imageRes.success) {
                         uploadedImageUrl = imageRes.imageUrl;
                     } else {
-                        Alert.alert("Upload Error", "Failed to upload the invoice image.");
+                        HapticHelper.error();
+                        UniversalAlert.alert("Upload Error", "Failed to upload the invoice image.");
                         setIsLoading(false);
                         return;
                     }
@@ -198,25 +195,33 @@ export default function StockInScreen() {
                 const response = await postToGAS('receive', { data: payload });
 
                 if (response && response.success !== false) {
-                    Alert.alert("Success", "Stock record saved successfully!");
+                    HapticHelper.success();
+                    UniversalAlert.alert("Success", "Stock record saved successfully!");
                     clearForm();
-                    if (entryMode === 'restock') fetchInventory(); // Refresh stock counts invisibly
+                    // Force refresh inventory cache invisibly so new stock reflects everywhere
+                    if (entryMode === 'restock') loadInventory(true);
                 } else {
-                    Alert.alert("Error", response.message || "Failed to update the database.");
+                    HapticHelper.error();
+                    UniversalAlert.alert("Error", response.message || "Failed to update the database.");
                 }
             } catch (err) {
-                Alert.alert("Error", "An unexpected network error occurred.");
+                HapticHelper.error();
+                UniversalAlert.alert("Error", "An unexpected network error occurred.");
             }
         } else {
-            Alert.alert("Offline Mode", "Image uploads cannot be processed offline at this time. Standard offline tracking requires adjustments to store large image files locally.");
+            HapticHelper.error();
+            UniversalAlert.alert("Offline Mode", "Image uploads cannot be processed offline at this time. Standard offline tracking requires adjustments to store large image files locally.");
         }
 
         setIsLoading(false);
     };
 
     return (
-        <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={[styles.container, { paddingBottom: 0 }]} edges={['top', 'left', 'right']}>
             <View style={styles.headerRow}>
+                <TouchableOpacity onPress={() => navigation.goBack()}>
+                    <Ionicons name="arrow-back" size={24} color={theme.text} />
+                </TouchableOpacity>
                 <Text style={styles.headerTitle}>Stock In / Expense</Text>
                 <View style={[styles.networkBadge, { backgroundColor: isOnline ? theme.primary : '#FF3B30' }]}>
                     <Text style={styles.networkText}>{isOnline ? 'Online' : 'Offline'}</Text>
@@ -299,7 +304,11 @@ export default function StockInScreen() {
                     <Text style={styles.inputLabel}>Invoice Picture</Text>
                     <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
                         {invoiceImage ? (
-                            <Image source={{ uri: invoiceImage }} style={styles.imagePreview} />
+                            <Image
+                                source={{ uri: invoiceImage }}
+                                style={styles.imagePreview}
+                                contentFit="cover"
+                            />
                         ) : (
                             <View style={styles.imagePlaceholder}>
                                 <Ionicons name="camera-outline" size={32} color={theme.textMuted} />
@@ -353,7 +362,7 @@ export default function StockInScreen() {
                             placeholder="Search by name or ID..."
                             placeholderTextColor={theme.textMuted}
                             value={searchQuery}
-                            onChangeText={handleSearch}
+                            onChangeText={setSearchQuery}
                         />
 
                         {isFetchingItems ? (
@@ -372,8 +381,8 @@ export default function StockInScreen() {
                                     >
                                         <Text style={styles.modalItemName}>{item.itemName}</Text>
                                         <View style={{ flexDirection: 'row', marginTop: 4, alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <Text style={styles.modalItemSub}>{item.category} • {item.location} • {item.rack}</Text> 
-                                        <Text style={{color: item.openingStock < item.minStock ? theme.danger : theme.primary}}>Stock Available: {item.openingStock}</Text>
+                                            <Text style={styles.modalItemSub}>{item.category} • {item.location} • {item.rack}</Text>
+                                            <Text style={{ color: item.openingStock < item.minStock ? theme.danger : theme.primary }}>Stock Available: {item.openingStock}</Text>
                                         </View>
                                     </TouchableOpacity>
                                 )}
@@ -414,7 +423,7 @@ const getStyles = (theme) => StyleSheet.create({
     stockHint: { color: theme.primary, fontSize: 12, marginTop: 4, marginLeft: 4, fontWeight: '500' },
 
     imagePicker: { backgroundColor: theme.inputBg, borderRadius: 12, height: 130, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: theme.card, borderStyle: 'dashed' },
-    imagePreview: { width: '100%', height: '100%', resizeMode: 'cover' },
+    imagePreview: { width: '100%', height: '100%', borderRadius: 12 },
     imagePlaceholder: { alignItems: 'center' },
     imagePlaceholderText: { color: theme.textMuted, marginTop: 8, fontSize: 14 },
 

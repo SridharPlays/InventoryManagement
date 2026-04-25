@@ -2,24 +2,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    LayoutAnimation,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    UIManager,
-    View
+  ActivityIndicator,
+  FlatList,
+  LayoutAnimation,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  UIManager,
+  View
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
-import { fetchFromGAS, postToGAS } from '../services/api';
+import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
+import { useInventory } from '../hooks/useInventory';
+import { HapticHelper } from '../utils/haptics';
+import { UniversalAlert } from '../utils/UniversalAlert';
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -58,6 +60,8 @@ const RackSection = ({ rackName, items, isAdmin, cart, updateQuantity }) => {
         <View style={styles.rackContent}>
           {items.map((item, i) => {
             const cartQty = cart[item.itemId]?.requestQty || 0;
+            const availableStock = parseInt(item.openingStock, 10) || 0;
+            const isMaxStock = cartQty >= availableStock;
 
             return (
               <View key={i} style={styles.listCard}>
@@ -76,7 +80,7 @@ const RackSection = ({ rackName, items, isAdmin, cart, updateQuantity }) => {
                 <View style={styles.listTrailing}>
                   <Text style={styles.stockText}>Stock: {item.openingStock}</Text>
 
-                  {/* Quantity Controls for Non-Admins */}
+                  {/* Quantity Controls */}
                   {!isAdmin && (
                     <View style={styles.qtyContainer}>
                       {cartQty > 0 ? (
@@ -85,12 +89,20 @@ const RackSection = ({ rackName, items, isAdmin, cart, updateQuantity }) => {
                             <Ionicons name="remove" size={18} color={theme.text} />
                           </TouchableOpacity>
                           <Text style={styles.qtyText}>{cartQty}</Text>
-                          <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, 1)}>
+                          <TouchableOpacity
+                            style={[styles.qtyBtn, isMaxStock && { opacity: 0.3 }]}
+                            onPress={() => updateQuantity(item, 1)}
+                            disabled={isMaxStock}
+                          >
                             <Ionicons name="add" size={18} color={theme.text} />
                           </TouchableOpacity>
                         </>
                       ) : (
-                        <TouchableOpacity style={styles.addBtn} onPress={() => updateQuantity(item, 1)}>
+                        <TouchableOpacity
+                          style={[styles.addBtn, availableStock <= 0 && { opacity: 0.5 }]}
+                          onPress={() => updateQuantity(item, 1)}
+                          disabled={availableStock <= 0}
+                        >
                           <Ionicons name="add" size={18} color={theme.primary} />
                           <Text style={styles.addBtnText}>Add</Text>
                         </TouchableOpacity>
@@ -115,6 +127,9 @@ export default function CupboardScreen({ route, navigation }) {
   const { theme } = useTheme();
   const styles = getStyles(theme);
 
+  // Hook Initialization
+  const { inventory, loading, loadInventory } = useInventory();
+
   // Cart State
   const [cart, setCart] = useState({});
   const [cartModalVisible, setCartModalVisible] = useState(false);
@@ -133,8 +148,14 @@ export default function CupboardScreen({ route, navigation }) {
     }, [])
   );
 
+  // Trigger Inventory Load on mount
   useEffect(() => {
-    const fetchLocalInventoryAndUser = async () => {
+    loadInventory();
+  }, [loadInventory]);
+
+  // Process Inventory and User Data whenever inventory updates
+  useEffect(() => {
+    const fetchLocalUserAndProcessInventory = async () => {
       // Load User Name for the request
       const session = await StorageService.getSession();
       if (session) {
@@ -142,15 +163,9 @@ export default function CupboardScreen({ route, navigation }) {
         if (parsed.name) setUserName(parsed.name);
       }
 
-      // Load Inventory
-      let cachedInventory = await StorageService.getCachedData('getInventory') || [];
+      if (!inventory || inventory.length === 0) return;
 
-      if (cachedInventory.length === 0) {
-        cachedInventory = await fetchFromGAS('getInventory');
-        await StorageService.cacheData('getInventory', cachedInventory); // Update cache with fresh data
-      }
-
-      const filtered = cachedInventory.filter(item => {
+      const filtered = inventory.filter(item => {
         const matchesCupboard = item.cupboard?.toLowerCase() === cupboardId.toLowerCase();
         const floorRegex = new RegExp(`(^|\\D)${floorId}(\\D|$)`);
         const matchesFloor = floorRegex.test(item.location || "");
@@ -176,8 +191,8 @@ export default function CupboardScreen({ route, navigation }) {
       setGroupedItems(sortedGroupedArray);
     };
 
-    fetchLocalInventoryAndUser();
-  }, [cupboardId, floorId]);
+    fetchLocalUserAndProcessInventory();
+  }, [inventory, cupboardId, floorId]);
 
   // CART LOGIC
   const updateQuantity = (item, delta) => {
@@ -187,7 +202,8 @@ export default function CupboardScreen({ route, navigation }) {
       const availableStock = parseInt(item.openingStock, 10) || 0;
 
       if (newQty > availableStock) {
-        Alert.alert("Stock Limit", `Only ${availableStock} items available in stock.`);
+        UniversalAlert.alert("Stock Limit", `Only ${availableStock} items available in stock.`);
+        HapticHelper.error();
         return prev;
       }
 
@@ -208,7 +224,8 @@ export default function CupboardScreen({ route, navigation }) {
   const clearCart = async () => {
     setCart({});
     setCartModalVisible(false);
-    await StorageService.removeCachedData('requestCart'); // Clear from storage
+    HapticHelper.success();
+    await StorageService.removeCachedData('requestCart');
   };
 
   const submitRequest = async () => {
@@ -232,24 +249,27 @@ export default function CupboardScreen({ route, navigation }) {
       const response = await postToGAS('request', payload);
 
       if (response.success) {
-        Alert.alert(
+        HapticHelper.success();
+        UniversalAlert.alert(
           "Request Submitted",
           `Successfully sent ${cartItems.length} items to the Admin for approval.`,
           [{ text: "OK", onPress: () => { clearCart(); } }]
         );
       } else {
-        Alert.alert("Error", response.message || "Failed to submit request.");
+        HapticHelper.error();
+        UniversalAlert.alert("Error", response.message || "Failed to submit request.");
       }
 
     } catch (e) {
-      Alert.alert("Error", "Network error while submitting requests.");
+      HapticHelper.error();
+      UniversalAlert.alert("Error", "Network error while submitting requests.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const confirmClearCart = () => {
-    Alert.alert(
+    UniversalAlert.alert(
       "Clear Cart",
       "Are you sure you want to remove all items from your request?",
       [
@@ -266,7 +286,7 @@ export default function CupboardScreen({ route, navigation }) {
   const cartItemCount = Object.keys(cart).length;
 
   return (
-    <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.container, { paddingBottom: 0 }]} edges={['top', 'left', 'right']}>
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
@@ -277,23 +297,27 @@ export default function CupboardScreen({ route, navigation }) {
         </View>
       </View>
 
-      <ScrollView style={styles.content}>
-        {groupedItems.length === 0 ? (
-          <Text style={styles.emptyText}>No items found in this location.</Text>
-        ) : (
-          groupedItems.map((group, index) => (
-            <RackSection
-              key={index}
-              rackName={group.rackName}
-              items={group.items}
-              isAdmin={isAdmin}
-              cart={cart}
-              updateQuantity={updateQuantity}
-            />
-          ))
-        )}
-        <View style={{ height: cartItemCount > 0 ? 100 : 40 }} />
-      </ScrollView>
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 40 }} size="large" color={theme.primary} />
+      ) : (
+        <ScrollView style={styles.content}>
+          {groupedItems.length === 0 ? (
+            <Text style={styles.emptyText}>No items found in this location.</Text>
+          ) : (
+            groupedItems.map((group, index) => (
+              <RackSection
+                key={index}
+                rackName={group.rackName}
+                items={group.items}
+                isAdmin={isAdmin}
+                cart={cart}
+                updateQuantity={updateQuantity}
+              />
+            ))
+          )}
+          <View style={{ height: cartItemCount > 0 ? 100 : 40 }} />
+        </ScrollView>
+      )}
 
       {/* Floating Cart Button */}
       {cartItemCount > 0 && !isAdmin && (
@@ -335,23 +359,32 @@ export default function CupboardScreen({ route, navigation }) {
             data={Object.values(cart)}
             keyExtractor={item => item.itemId}
             contentContainerStyle={styles.cartList}
-            renderItem={({ item }) => (
-              <View style={styles.cartItem}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cartItemName}>{item.itemName}</Text>
-                  <Text style={styles.cartItemSub}>ID: {item.itemId}</Text>
+            renderItem={({ item }) => {
+              const availableStock = parseInt(item.openingStock, 10) || 0;
+              const isMaxStock = item.requestQty >= availableStock;
+
+              return (
+                <View style={styles.cartItem}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cartItemName}>{item.itemName}</Text>
+                    <Text style={styles.cartItemSub}>ID: {item.itemId}</Text>
+                  </View>
+                  <View style={styles.qtyContainer}>
+                    <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, -1)}>
+                      <Ionicons name="remove" size={18} color={theme.text} />
+                    </TouchableOpacity>
+                    <Text style={styles.qtyText}>{item.requestQty}</Text>
+                    <TouchableOpacity
+                      style={[styles.qtyBtn, isMaxStock && { opacity: 0.3 }]}
+                      onPress={() => updateQuantity(item, 1)}
+                      disabled={isMaxStock}
+                    >
+                      <Ionicons name="add" size={18} color={theme.text} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={styles.qtyContainer}>
-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, -1)}>
-                    <Ionicons name="remove" size={18} color={theme.text} />
-                  </TouchableOpacity>
-                  <Text style={styles.qtyText}>{item.requestQty}</Text>
-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item, 1)}>
-                    <Ionicons name="add" size={18} color={theme.text} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+              );
+            }}
             ListEmptyComponent={
               <Text style={styles.emptyCartText}>No items added to request.</Text>
             }

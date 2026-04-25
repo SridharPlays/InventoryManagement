@@ -6,6 +6,8 @@ import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { StorageService } from '../services/storage';
+import { HapticHelper } from '../utils/haptics';
+import { UniversalAlert } from '../utils/UniversalAlert';
 
 export default function ScannerScreen({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
@@ -17,7 +19,7 @@ export default function ScannerScreen({ navigation }) {
   
   const isFocused = useIsFocused(); 
 
-  // --- Animation Setup ---
+  // Animation Setup
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -43,7 +45,16 @@ export default function ScannerScreen({ navigation }) {
     return (
       <View style={styles.center}>
         <Text style={{ color: theme.text, marginBottom: 20 }}>Camera permission required.</Text>
-        <TouchableOpacity style={styles.btn} onPress={requestPermission}>
+        <TouchableOpacity style={styles.btn} onPress={() => {
+          requestPermission()
+            .then(({ granted }) => {
+              if (!granted) {
+                UniversalAlert.alert("Error", "Camera access is needed to scan QR codes.");
+                HapticHelper.error();
+              }
+            })
+            .catch(() => UniversalAlert.alert("Error", "Permission request failed. Please try again."));
+        }}>
           <Text style={styles.btnText}>Grant</Text>
         </TouchableOpacity>
       </View>
@@ -62,12 +73,15 @@ export default function ScannerScreen({ navigation }) {
       const isAdmin = userRole === "admin";
 
       if (cupboardId) {
+        HapticHelper.success();
         navigation.navigate("Cupboard", { cupboardId, floorId, isAdmin });
       } else {
-        alert("Invalid QR Code format.");
+        UniversalAlert.alert("Error", "Invalid QR Code format.");
+        HapticHelper.error();
       }
     } catch (e) {
-      alert("Unrecognized QR Code.");
+      UniversalAlert.alert("Error", "Unrecognized QR Code.");
+      HapticHelper.error();
     }
     
     setTimeout(() => setScanned(false), 2000); 

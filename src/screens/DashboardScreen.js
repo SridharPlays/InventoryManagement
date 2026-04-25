@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { fetchFromGAS, postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
+import { HapticHelper } from '../utils/haptics';
 
 export default function DashboardScreen() {
   const { theme } = useTheme();
@@ -78,7 +79,9 @@ export default function DashboardScreen() {
         {
           text: "Yes",
           style: "destructive",
-          onPress: () => ignoreLowStockAlert(item)
+          onPress: () => {
+            ignoreLowStockAlert(item)
+          }
         }
       ]
     );
@@ -92,6 +95,7 @@ export default function DashboardScreen() {
 
       if (!fullItem) {
         Alert.alert("Error", "Could not find full item details. Try refreshing the app first.");
+        HapticHelper.error();
         setRefreshing(false);
         return;
       }
@@ -101,10 +105,12 @@ export default function DashboardScreen() {
 
       if (response.success) {
         Alert.alert("Success", `${lowStockItem.name} will no longer trigger alerts.`);
+        HapticHelper.success();
         await StorageService.removeCachedData('getInventory');
         loadData(true);
       } else {
         Alert.alert("Error", response.message || "Failed to update item.");
+        HapticHelper.error();
         setRefreshing(false);
       }
     } catch (error) {
@@ -133,6 +139,7 @@ export default function DashboardScreen() {
   const processMarkReturned = async (item) => {
     if (!item.id) {
       Alert.alert("Error", "Missing item ID. Ensure backend sends 'id' in getDashboard.");
+      HapticHelper.error();
       return;
     }
 
@@ -142,15 +149,18 @@ export default function DashboardScreen() {
 
       if (response.success) {
         Alert.alert("Success", `${item.item} has been marked as returned.`);
+        HapticHelper.success();
         await StorageService.removeCachedData('getDashboard'); // Clear cache
         loadData(true); // Refresh dashboard to remove the item from the list
       } else {
         Alert.alert("Error", response.message || "Failed to mark as returned.");
+        HapticHelper.error();
         setRefreshing(false);
       }
     } catch (error) {
       console.error("Error marking as returned:", error);
       Alert.alert("Error", "An unexpected network error occurred.");
+      HapticHelper.error();
       setRefreshing(false);
     }
   };
@@ -317,7 +327,10 @@ export default function DashboardScreen() {
                   key={i}
                   style={styles.listCard}
                   activeOpacity={0.7}
-                  onLongPress={() => handleLongPressLowStock(item)}
+                  onLongPress={() => {
+                    HapticHelper.lightImpact();
+                    handleLongPressLowStock(item)}
+                  }
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle}>{item.name}</Text>

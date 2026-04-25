@@ -10,10 +10,8 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { theme } from '../constants/theme';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 import { useInventory } from '../hooks/useInventory';
@@ -21,8 +19,9 @@ import { UniversalAlert } from '../utils/UniversalAlert';
 import BottomSheetModal from '../components/BottomSheetModal';
 import { MONTHS, YEARS } from '../constants/time';
 import { useTheme } from '../context/ThemeContext';
+import { HapticHelper } from '../utils/haptics';
 
-export default function ReportScreen() {
+export default function ReportScreen({ navigation }) {
   const { inventory, loadInventory } = useInventory();
   const [isLoading, setIsLoading] = useState(false);
   const [userEmail, setUserEmail] = useState("");
@@ -57,7 +56,9 @@ export default function ReportScreen() {
         try {
           const parsed = typeof userSession === 'string' ? JSON.parse(userSession) : userSession;
           if (parsed && parsed.email) setUserEmail(parsed.email);
+          HapticHelper.lightImpact();
         } catch (e) {
+          HapticHelper.error();
           console.error(e);
         }
       }
@@ -65,7 +66,7 @@ export default function ReportScreen() {
     loadSession();
   }, [loadInventory]);
 
-  // DATA MEMOIZATION
+  // Data Processing 
   const uniqueFloors = useMemo(() => Array.from(new Set(inventory.map(i => i.location).filter(Boolean))).sort(), [inventory]);
   const sortedCupboards = useMemo(() => {
     if (!selectedFloor) return [];
@@ -88,7 +89,7 @@ export default function ReportScreen() {
     return currentReportData.reduce((sum, item) => sum + (parseFloat(item.amount || item.Amount || item.total || item.Total || item.price || item.Price || 0) || 0), 0);
   }, [currentReportData]);
 
-  // REPORT GENERATION LOGIC
+  // Report Generations Logics
   const generateDirectLocalReport = (type) => {
     if (inventory.length === 0) return UniversalAlert.alert("No Data", "Inventory data is not available right now.");
     let reportTitle = "";
@@ -118,6 +119,7 @@ export default function ReportScreen() {
     setCurrentReportTitle(reportTitle);
     setCurrentReportData(data);
     setReportModalVisible(true);
+    HapticHelper.lightImpact();
   };
 
   const openConfigScreen = (type) => {
@@ -168,11 +170,14 @@ export default function ReportScreen() {
         setCurrentReportTitle(params.month === 'all' ? `Annual Report (${params.year})` : `Monthly Stock-In (${params.month}/${params.year})`);
         setCurrentReportData(response.data);
         setReportModalVisible(true);
+        HapticHelper.mediumImpact();
       } else {
+        HapticHelper.error();
         UniversalAlert.alert("No Data", "No records found for this period.");
       }
     } catch (e) {
-      UniversalAlert.alert("Error", "Network error.");
+      HapticHelper.error();
+      UniversalAlert.alert("Error", "Network error." + (e.message ? ` (${e.message})` : ""));
     } finally {
       setIsLoading(false);
     }
@@ -190,8 +195,10 @@ export default function ReportScreen() {
         UniversalAlert.alert("Error", response.message || "Failed to send report.");
       }
     } catch (e) {
-      UniversalAlert.alert("Error", "Network error while sending report.");
+      UniversalAlert.alert("Error", "Network error while sending report." + (e.message ? ` (${e.message})` : ""));
+
     } finally {
+      HapticHelper.mediumImpact();
       setIsLoading(false);
     }
   };
@@ -298,10 +305,15 @@ export default function ReportScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Inventory Reports</Text>
-        <Text style={styles.headerSub}>Export data to PDF or Excel formats</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={28} color={theme.text} />
+        </TouchableOpacity>
+        <View>
+          <Text style={styles.headerTitle}>Inventory Reports</Text>
+          <Text style={styles.headerSub}>Export data to PDF or Excel formats</Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -430,7 +442,16 @@ export default function ReportScreen() {
 
 const getStyles = (theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
-  header: { padding: 20, paddingBottom: 10 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    paddingBottom: 10
+  },
+  backButton: {
+    marginRight: 16,
+    padding: 4
+  },
   headerTitle: { color: theme.text, fontSize: 26, fontWeight: 'bold' },
   headerSub: { color: theme.textMuted, fontSize: 14, marginTop: 4 },
   scrollContent: { padding: 16 },

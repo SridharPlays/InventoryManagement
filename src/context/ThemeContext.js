@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import { darkTheme, lightTheme } from '../constants/theme';
+import { HapticHelper } from '../utils/haptics';
 
 export const ThemeContext = createContext();
 
@@ -21,6 +22,7 @@ export const ThemeProvider = ({ children }) => {
           // Fallback to system preference if nothing is saved
           setIsDarkMode(systemColorScheme === 'dark');
         }
+        await HapticHelper.success();
       } catch (error) {
         console.error('Error loading theme:', error);
       } finally {
