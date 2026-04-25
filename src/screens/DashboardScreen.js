@@ -1,21 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { useCallback, useEffect, useState } from 'react';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
 import {
-  Alert,
   Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
-  View
+  View,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { fetchFromGAS, postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
+import { useInventory } from '../hooks/useInventory';
 import { HapticHelper } from '../utils/haptics';
+import { UniversalAlert } from '../utils/UniversalAlert';
 
 export default function DashboardScreen() {
   const { theme } = useTheme();
@@ -25,6 +29,62 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isLowStockModalVisible, setLowStockModalVisible] = useState(false);
   const [isItemIssuedModalVisible, setItemIssuedModalVisible] = useState(false);
+
+  const [isReturnModalVisible, setReturnModalVisible] = useState(false);
+  const [selectedReturnItem, setSelectedReturnItem] = useState(null);
+  const [returnQty, setReturnQty] = useState(1);
+  const [returnReason, setReturnReason] = useState('');
+
+  const [isReturnedListModalVisible, setReturnedListModalVisible] = useState(false);
+  const [isDiscardedListModalVisible, setDiscardedListModalVisible] = useState(false);
+
+  // Hook Initialization
+  const { inventory, loadInventory } = useInventory();
+
+  const openReturnModal = (item) => {
+    setSelectedReturnItem(item);
+    setReturnQty(item.qty || 1);
+    setReturnReason('');
+    setReturnModalVisible(true);
+    setItemIssuedModalVisible(false); // Close the other modal if open
+  };
+
+  const processReturnItem = async () => {
+    if (returnQty < selectedReturnItem.qty && !returnReason.trim()) {
+      HapticHelper.error();
+      UniversalAlert.alert("Reason Required", `You are keeping ${selectedReturnItem.qty - returnQty} items. Please provide a reason.`);
+      return;
+    }
+
+    try {
+      setRefreshing(true);
+      setReturnModalVisible(false);
+
+      const response = await postToGAS('markReturned', {
+        data: {
+          rowNumber: selectedReturnItem.id,
+          returnQty: returnQty,
+          reason: returnReason.trim()
+        }
+      });
+
+      if (response.success) {
+        HapticHelper.success();
+        UniversalAlert.alert("Success", response.message);
+        await StorageService.removeCachedData('getDashboard');
+        loadData(true);
+      } else {
+        HapticHelper.error();
+        UniversalAlert.alert("Error", response.message || "Failed to process return.");
+        setRefreshing(false);
+      }
+    } catch (error) {
+      console.error("Error returning:", error);
+      HapticHelper.error();
+      UniversalAlert.alert("Error", "Network error occurred.");
+      setRefreshing(false);
+    }
+  };
 
   const parseLowStockData = (lowStockArray) => {
     if (!lowStockArray || !Array.isArray(lowStockArray)) return [];
@@ -65,13 +125,17 @@ export default function DashboardScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadData(false);
-  }, [loadData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData(false);
+      loadInventory();
+    }, [loadData, loadInventory])
+  );
 
   // LOW STOCK LOGIC
   const handleLongPressLowStock = (item) => {
-    Alert.alert(
+    HapticHelper.lightImpact();
+    UniversalAlert.alert(
       "Ignore Low Stock?",
       `Do you want to ignore future low stock alerts for ${item.name}?`,
       [
@@ -90,12 +154,13 @@ export default function DashboardScreen() {
   const ignoreLowStockAlert = async (lowStockItem) => {
     try {
       setRefreshing(true);
-      const inventory = await StorageService.getCachedData('getInventory') || [];
-      const fullItem = inventory.find(invItem => invItem.itemId === lowStockItem.id);
+      // Use hook inventory or fallback to local storage
+      const currentInv = inventory?.length ? inventory : await StorageService.getCachedData('getInventory') || [];
+      const fullItem = currentInv.find(invItem => invItem.itemId === lowStockItem.id);
 
       if (!fullItem) {
-        Alert.alert("Error", "Could not find full item details. Try refreshing the app first.");
         HapticHelper.error();
+        UniversalAlert.alert("Error", "Could not find full item details. Try refreshing the app first.");
         setRefreshing(false);
         return;
       }
@@ -104,25 +169,27 @@ export default function DashboardScreen() {
       const response = await postToGAS('updateItem', { itemData: updatedItem });
 
       if (response.success) {
-        Alert.alert("Success", `${lowStockItem.name} will no longer trigger alerts.`);
         HapticHelper.success();
+        UniversalAlert.alert("Success", `${lowStockItem.name} will no longer trigger alerts.`);
         await StorageService.removeCachedData('getInventory');
+        loadInventory(true); // Refresh background cache
         loadData(true);
       } else {
-        Alert.alert("Error", response.message || "Failed to update item.");
         HapticHelper.error();
+        UniversalAlert.alert("Error", response.message || "Failed to update item.");
         setRefreshing(false);
       }
     } catch (error) {
       console.error("Error ignoring low stock:", error);
-      Alert.alert("Error", "An unexpected network error occurred.");
+      HapticHelper.error();
+      UniversalAlert.alert("Error", "An unexpected network error occurred.");
       setRefreshing(false);
     }
   };
 
-  // NEW: MARK AS RETURNED LOGIC
+  // MARK AS RETURNED LOGIC
   const handleMarkReturned = (item) => {
-    Alert.alert(
+    UniversalAlert.alert(
       "Confirm Return",
       `Are you sure you want to mark ${item.item} as returned?`,
       [
@@ -138,8 +205,8 @@ export default function DashboardScreen() {
 
   const processMarkReturned = async (item) => {
     if (!item.id) {
-      Alert.alert("Error", "Missing item ID. Ensure backend sends 'id' in getDashboard.");
       HapticHelper.error();
+      UniversalAlert.alert("Error", "Missing item ID. Ensure backend sends 'id' in getDashboard.");
       return;
     }
 
@@ -148,19 +215,58 @@ export default function DashboardScreen() {
       const response = await postToGAS('markReturned', { rowNumber: item.id });
 
       if (response.success) {
-        Alert.alert("Success", `${item.item} has been marked as returned.`);
         HapticHelper.success();
+        UniversalAlert.alert("Success", `${item.item} has been marked as returned.`);
         await StorageService.removeCachedData('getDashboard'); // Clear cache
         loadData(true); // Refresh dashboard to remove the item from the list
       } else {
-        Alert.alert("Error", response.message || "Failed to mark as returned.");
         HapticHelper.error();
+        UniversalAlert.alert("Error", response.message || "Failed to mark as returned.");
         setRefreshing(false);
       }
     } catch (error) {
       console.error("Error marking as returned:", error);
-      Alert.alert("Error", "An unexpected network error occurred.");
       HapticHelper.error();
+      UniversalAlert.alert("Error", "An unexpected network error occurred.");
+      setRefreshing(false);
+    }
+  };
+
+  const handleMarkDiscarded = (item) => {
+    UniversalAlert.alert(
+      "Discard Item",
+      `Are you sure you want to discard ${item.item}? This clears it from the list without returning stock.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Yes, Discard",
+          style: "destructive",
+          onPress: () => processMarkDiscarded(item)
+        }
+      ]
+    );
+  };
+
+  const processMarkDiscarded = async (item) => {
+    if (!item.id) return;
+    try {
+      setRefreshing(true);
+      const response = await postToGAS('markDiscarded', { rowNumber: item.id });
+
+      if (response.success) {
+        HapticHelper.success();
+        UniversalAlert.alert("Discarded", `${item.item} has been discarded.`);
+        await StorageService.removeCachedData('getDashboard');
+        loadData(true);
+      } else {
+        HapticHelper.error();
+        UniversalAlert.alert("Error", response.message || "Failed to discard.");
+        setRefreshing(false);
+      }
+    } catch (error) {
+      console.error("Error discarding:", error);
+      HapticHelper.error();
+      UniversalAlert.alert("Error", "Network error.");
       setRefreshing(false);
     }
   };
@@ -203,7 +309,7 @@ export default function DashboardScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.container, { paddingBottom: 0 }]} edges={['top', 'left', 'right']}>
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} tintColor={theme.primary} />
@@ -253,10 +359,19 @@ export default function DashboardScreen() {
                 value={data.summary?.totalItems}
                 highlightColor={theme.primary}
               />
-              <SummaryCard title="Items Issued" value={data.summary?.itemsIssued} highlightColor={theme.primary} onPress={() => setItemIssuedModalVisible(true)} />
+              <SummaryCard title="Items Issued" value={data.summary?.itemsIssued} highlightColor={'rgba(255, 81, 0, 0.68)'} onPress={() => setItemIssuedModalVisible(true)} />
             </View>
             <View style={styles.gridRow}>
               <SummaryCard title="Pending Returns" value={data.summary?.pendingReturns} highlightColor={theme.warning} />
+              <SummaryCard title="Total Returned" value={data.summary?.totalReturned} highlightColor={theme.success || '#10B981'} onPress={() => setReturnedListModalVisible(true)} />
+            </View>
+            <View style={styles.gridRow}>
+              <SummaryCard
+                title="Total Discarded"
+                value={data.summary?.totalDiscarded}
+                highlightColor={'#ff0055'}
+                onPress={() => setDiscardedListModalVisible(true)}
+              />
               <SummaryCard
                 title="Low Stock"
                 value={data.summary?.lowStock}
@@ -268,30 +383,56 @@ export default function DashboardScreen() {
             {/* Pending Returns Section */}
             <Text style={styles.sectionTitle}>Pending Returns</Text>
             {data.pendingReturns?.length ? data.pendingReturns.map((item, i) => {
-              console.log(item);
-              const isOverdue = item.overdueDays > 0;
+              const isOverdue = item.overdueDays > 0 && item.isReturnable;
               const statusColor = isOverdue ? (theme.danger || '#EF4444') : (theme.success || '#10B981');
+
               return (
                 <View key={i} style={styles.listCard}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitle}>{item.item}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <Text style={styles.cardTitle}>{item.item}</Text>
+                      {item.isUrgent && (
+                        <View style={{ backgroundColor: '#F59E0B20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center' }}>
+                          <Ionicons name="flash" size={12} color="#F59E0B" />
+                          <Text style={{ fontSize: 10, color: '#F59E0B', fontWeight: 'bold', marginLeft: 2 }}>URGENT</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.cardSub}>Issued to: {item.issuedTo}</Text>
                     <Text style={styles.cardSub}>Due: {item.dueDate}</Text>
                   </View>
 
-                  {/* UPDATE: Added column layout for badge + button */}
                   <View style={styles.actionColumn}>
-                    <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-                      <Text style={[styles.statusText, { color: statusColor }]}>
-                        {isOverdue ? `+${item.overdueDays} Days Overdue` : 'Due Soon'}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.returnButton}
-                      onPress={() => handleMarkReturned(item)}
-                    >
-                      <Text style={styles.returnButtonText}>Mark Returned</Text>
-                    </TouchableOpacity>
+                    {item.isReturnable ? (
+                      <>
+                        <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
+                          <Text style={[styles.statusText, { color: statusColor }]}>
+                            {isOverdue ? `+${item.overdueDays} Days Overdue` : 'Due Soon'}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.returnButton}
+                          onPress={() => openReturnModal(item)}
+                        >
+                          <Text style={styles.returnButtonText}>Process Return</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <>
+                        <View style={[styles.statusBadge, { backgroundColor: theme.textMuted + '20' }]}>
+                          <Text style={[styles.statusText, { color: theme.textMuted }]}>
+                            Non-Returnable
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.returnButton, { backgroundColor: theme.danger || '#EF4444', flexDirection: 'row', alignItems: 'center', gap: 4 }]}
+                          onPress={() => handleMarkDiscarded(item)}
+                        >
+                          <Ionicons name="trash" size={14} color="#FFF" />
+                          <Text style={styles.returnButtonText}>Discard ({item.qty})</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
                   </View>
                 </View>
               );
@@ -327,10 +468,7 @@ export default function DashboardScreen() {
                   key={i}
                   style={styles.listCard}
                   activeOpacity={0.7}
-                  onLongPress={() => {
-                    HapticHelper.lightImpact();
-                    handleLongPressLowStock(item)}
-                  }
+                  onLongPress={() => handleLongPressLowStock(item)}
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle}>{item.name}</Text>
@@ -343,6 +481,156 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               )) : (
                 <Text style={styles.emptyText}>Inventory levels look good. 👍</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* PARTIAL RETURN MODAL */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isReturnModalVisible}
+        onRequestClose={() => setReturnModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { paddingBottom: 40, maxHeight: '90%' }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Process Return</Text>
+                <TouchableOpacity onPress={() => setReturnModalVisible(false)}>
+                  <Ionicons name="close" size={24} color={theme.text} />
+                </TouchableOpacity>
+              </View>
+
+              {selectedReturnItem && (
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingBottom: 20 }}
+                >
+                  <Text style={styles.cardTitle}>{selectedReturnItem.item}</Text>
+                  <Text style={[styles.cardSub, { marginBottom: 16 }]}>Total Issued: {selectedReturnItem.qty}</Text>
+
+                  <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 8, fontWeight: 'bold' }}>QUANTITY TO RETURN</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBg, borderRadius: 12, alignSelf: 'flex-start', borderWidth: 1, borderColor: theme.border, marginBottom: 20 }}>
+                    <TouchableOpacity
+                      style={{ padding: 12, paddingHorizontal: 16 }}
+                      onPress={() => setReturnQty(Math.max(1, returnQty - 1))}
+                    >
+                      <Ionicons name="remove" size={20} color={theme.text} />
+                    </TouchableOpacity>
+                    <Text style={{ color: theme.text, fontSize: 18, fontWeight: 'bold', minWidth: 40, textAlign: 'center' }}>{returnQty}</Text>
+                    <TouchableOpacity
+                      style={{ padding: 12, paddingHorizontal: 16 }}
+                      onPress={() => setReturnQty(Math.min(selectedReturnItem.qty, returnQty + 1))}
+                    >
+                      <Ionicons name="add" size={20} color={theme.text} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 8, fontWeight: 'bold' }}>
+                    REMARKS / REASON {returnQty < selectedReturnItem.qty ? '(REQUIRED)' : '(OPTIONAL)'}
+                  </Text>
+                  <TextInput
+                    style={{ backgroundColor: theme.inputBg, color: theme.text, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.border, fontSize: 14, marginBottom: 20, minHeight: 80, textAlignVertical: 'top' }}
+                    placeholder={returnQty < selectedReturnItem.qty ? "Why are you keeping the remaining items?" : "Add a note..."}
+                    placeholderTextColor={theme.textMuted}
+                    multiline={true}
+                    value={returnReason}
+                    onChangeText={setReturnReason}
+                  />
+
+                  <TouchableOpacity
+                    style={{ backgroundColor: theme.primary, padding: 16, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
+                    onPress={processReturnItem}
+                  >
+                    <Ionicons name="checkmark-circle" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                    <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold' }}>
+                      {returnQty === selectedReturnItem.qty ? "Return All" : `Return ${returnQty} & Log Reason`}
+                    </Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* RETURNED ITEMS LOG MODAL */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isReturnedListModalVisible}
+        onRequestClose={() => setReturnedListModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Returned History</Text>
+              <TouchableOpacity onPress={() => setReturnedListModalVisible(false)}>
+                <Ionicons name="close" size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+              {data?.returnedItems?.length ? data.returnedItems.map((item, i) => (
+                <View key={`ret-log-${i}`} style={styles.listCard}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitle}>{item.item}</Text>
+                    <Text style={styles.cardSub}>Issued To: {item.issuedTo} | Qty: {item.qty}</Text>
+                    <Text style={styles.cardSub}>Date Logged: {item.date}</Text>
+                    {item.remarks ? (
+                      <Text style={[styles.cardSub, { fontStyle: 'italic', marginTop: 4, color: theme.text }]}>
+                        {item.remarks}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              )) : (
+                <Text style={styles.emptyText}>No items have been returned yet.</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* DISCARDED ITEMS LOG MODAL */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isDiscardedListModalVisible}
+        onRequestClose={() => setDiscardedListModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Discarded History</Text>
+              <TouchableOpacity onPress={() => setDiscardedListModalVisible(false)}>
+                <Ionicons name="close" size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+              {data?.discardedItems?.length ? data.discardedItems.map((item, i) => (
+                <View key={`disc-log-${i}`} style={styles.listCard}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitle}>{item.item}</Text>
+                    <Text style={styles.cardSub}>Issued To: {item.issuedTo} | Qty: {item.qty}</Text>
+                    <Text style={styles.cardSub}>Date Logged: {item.date}</Text>
+                    {item.remarks ? (
+                      <Text style={[styles.cardSub, { fontStyle: 'italic', marginTop: 4, color: theme.text }]}>
+                        {item.remarks}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              )) : (
+                <Text style={styles.emptyText}>No items have been discarded yet.</Text>
               )}
             </ScrollView>
           </View>
@@ -403,7 +691,7 @@ export default function DashboardScreen() {
         </View>
       </Modal>
 
-    </SafeAreaView>
+    </SafeAreaView >
   );
 }
 

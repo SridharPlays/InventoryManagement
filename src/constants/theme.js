@@ -24,6 +24,7 @@ export const darkTheme = {
   success: '#10B981',
   warning: '#F59E0B',
   danger: '#EF4444',
+  name: 'dark'
 };
 
 export const lightTheme = {
@@ -37,4 +38,5 @@ export const lightTheme = {
   success: '#10B981',
   warning: '#F59E0B',
   danger: '#EF4444',
+  name: 'light'
 };

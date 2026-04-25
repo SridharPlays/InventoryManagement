@@ -137,7 +137,10 @@ export default function ProfileScreen({ userData, setToken }) {
 
           const { sound } = await Audio.Sound.createAsync(soundsList[0]);
           soundRef.current = sound;
-          await sound.playAsync();
+
+          if(userData?.role !== "admin") {
+            await sound.playAsync();
+          }
 
           HapticHelper.success();
           UniversalAlert.alert("Success", "Profile picture updated!");
@@ -247,7 +250,7 @@ export default function ProfileScreen({ userData, setToken }) {
           </TouchableOpacity>
 
           {/* User Info Area - Triggers the Easter Egg (handlePress) */}
-          <TouchableOpacity style={styles.userInfo} onPress={handlePress} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.userInfo} activeOpacity={0.7}>
             <Text style={styles.userName}>{userData?.name || 'Guest User'}</Text>
             <Text style={styles.userEmail}>{userData?.email || 'No email found'}</Text>
           </TouchableOpacity>

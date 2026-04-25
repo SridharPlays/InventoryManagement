@@ -1,16 +1,15 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
@@ -200,7 +199,7 @@ export default function AlertsScreen({ navigation }) {
   }, {});
 
   return (
-    <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.container, { paddingBottom: 0 }]} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Alerts Center</Text>
         <Text style={styles.headerSub}>Manage notifications and approvals</Text>
@@ -260,77 +259,25 @@ export default function AlertsScreen({ navigation }) {
 
                 {/* Person's Items */}
                 {items.map((item, index) => {
-                  const isExpanded = expandedReq === item.row;
                   const isLast = index === items.length - 1;
-
                   return (
-                    <View key={`req_${item.row}`} style={[styles.itemRow, isLast && { borderBottomWidth: 0 }]}>
-                      <TouchableOpacity
-                        activeOpacity={0.7}
-                        onPress={() => handleExpandRequest(item)}
-                        style={styles.itemRowHeader}
-                      >
-                        <View style={styles.alertContent}>
-                          <Text style={styles.alertTitle}>{item.itemName}</Text>
-                          <Text style={styles.alertDesc}>Needs {item.qty} units ({item.date})</Text>
+                    <View key={`ret_${index}`} style={[styles.itemRow, isLast && { borderBottomWidth: 0 }]}>
+                      <View style={styles.alertContent}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <Text style={styles.alertTitle}>{item.item}</Text>
+                          {item.isUrgent && (
+                            <View style={{ backgroundColor: '#F59E0B20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center' }}>
+                              <Ionicons name="flash" size={12} color="#F59E0B" />
+                              <Text style={{ fontSize: 10, color: '#F59E0B', fontWeight: 'bold', marginLeft: 2 }}>URGENT</Text>
+                            </View>
+                          )}
                         </View>
-                        <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={theme.textMuted} />
-                      </TouchableOpacity>
-
-                      {/* Interactive Expandable Section */}
-                      {isExpanded && (
-                        <View style={styles.expandedSectionInner}>
-                          <Text style={styles.expandLabel}>Negotiate Quantity (Max: {item.qty})</Text>
-                          <View style={styles.stepperContainer}>
-                            <TouchableOpacity style={styles.stepperBtn} onPress={() => changeQty(-1, item.qty)}>
-                              <Ionicons name="remove" size={20} color={theme.text} />
-                            </TouchableOpacity>
-                            <Text style={styles.stepperValue}>{approveQty}</Text>
-                            <TouchableOpacity style={styles.stepperBtn} onPress={() => changeQty(1, item.qty)}>
-                              <Ionicons name="add" size={20} color={theme.text} />
-                            </TouchableOpacity>
-                          </View>
-
-                          <Text style={styles.expandLabel}>Admin Remarks</Text>
-                          <TextInput
-                            style={styles.remarksInput}
-                            placeholder="Add a note (e.g., Short on stock)..."
-                            placeholderTextColor={theme.textMuted}
-                            value={remarks}
-                            onChangeText={setRemarks}
-                          />
-
-                          {/* Action Buttons Row */}
-                          <View style={styles.actionButtonsRow}>
-                            <TouchableOpacity
-                              style={[styles.actionBtn, styles.declineBtn]}
-                              onPress={() => submitDecline(item.row)}
-                              disabled={isDeclining || isApproving}
-                            >
-                              {isDeclining ? <ActivityIndicator color="#FFF" /> : (
-                                <>
-                                  <Ionicons name="close-circle" size={18} color="#FFF" style={{ marginRight: 6 }} />
-                                  <Text style={styles.actionBtnText}>Decline</Text>
-                                </>
-                              )}
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={[styles.actionBtn, styles.approveBtn]}
-                              onPress={() => submitApproval(item.row)}
-                              disabled={isApproving || isDeclining}
-                            >
-                              {isApproving ? <ActivityIndicator color="#FFF" /> : (
-                                <>
-                                  <Ionicons name="checkmark-circle" size={18} color="#FFF" style={{ marginRight: 6 }} />
-                                  <Text style={styles.actionBtnText}>Approve {approveQty}</Text>
-                                </>
-                              )}
-                            </TouchableOpacity>
-                          </View>
-
-                        </View>
-                      )}
+                        <Text style={styles.alertDesc}>
+                          {item.isReturnable
+                            ? `Overdue by ${item.overdueDays} days.`
+                            : 'Pending Discard / Resolution.'}
+                        </Text>
+                      </View>
                     </View>
                   );
                 })}

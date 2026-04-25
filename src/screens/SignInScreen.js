@@ -191,8 +191,16 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
       >
         <View style={styles.headerCentered}>
           <Image
-            source={require("../../assets/images/caps.png")}
-            style={{ width: 250, height: 100, resizeMode: "contain" }}
+            source={
+              theme.name === 'light'
+                ? require("../../assets/images/caps_blue.png")
+                : require("../../assets/images/caps.png")
+            }
+            style={
+              theme.name === 'light'
+                ? { width: 280, height: 120, resizeMode: "contain" }
+                : { width: 250, height: 120, resizeMode: "contain" } 
+            }
           />
         </View>
 

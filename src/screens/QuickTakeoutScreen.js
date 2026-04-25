@@ -151,7 +151,7 @@ export default function QuickTakeoutScreen({ navigation }) {
           issuedBy: userData?.name || 'Quick Takeout',
           issuedTo: userData?.name || 'Self (TL)',
           purpose: `[URGENT] ${reason.trim()}`,
-          isReturnable: 'No',
+          isReturnable: 'Yes',
           dueDate: '',
           remarks: 'Quick Takeout Cart Checkout'
         };

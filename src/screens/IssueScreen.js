@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
+import DateTimePicker from '@react-native-community/datetimepicker';
+
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 import { useTheme } from '../context/ThemeContext';
@@ -46,7 +48,19 @@ export default function IssueScreen({ route, navigation }) {
   const [dueDate, setDueDate] = useState('');
   const [remarks, setRemarks] = useState('');
 
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const onDateChange = (event, selectedDate) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const year = selectedDate.getFullYear();
+      setDueDate(`${day}/${month}/${year}`);
+    }
+  };
 
   useEffect(() => {
     loadInventory();
@@ -71,7 +85,7 @@ export default function IssueScreen({ route, navigation }) {
     if (initialItemId && activeItems.length > 0 && !hasAutoSelected) {
       const itemToSelect = activeItems.find(i => i.itemId === initialItemId);
       const availableStock = parseInt(itemToSelect?.openingStock, 10) || 0;
-      
+
       if (itemToSelect && availableStock > 0) {
         setCart([{ ...itemToSelect, cartQty: 1 }]);
         setStep(2);
@@ -104,7 +118,7 @@ export default function IssueScreen({ route, navigation }) {
         HapticHelper.error();
         return prevCart;
       }
-      
+
       if (newQty <= 0) {
         return prevCart.filter(c => c.itemId !== item.itemId);
       }
@@ -158,13 +172,13 @@ export default function IssueScreen({ route, navigation }) {
       if (successCount > 0) {
         HapticHelper.success();
         UniversalAlert.alert(
-          "Success", 
-          `Successfully issued ${successCount} item(s).`, 
+          "Success",
+          `Successfully issued ${successCount} item(s).`,
           [{
             text: "OK",
             onPress: async () => {
-              await StorageService.removeCachedData('getInventory'); 
-              await StorageService.removeCachedData('getDashboard'); 
+              await StorageService.removeCachedData('getInventory');
+              await StorageService.removeCachedData('getDashboard');
               navigation.goBack();
             }
           }]
@@ -204,7 +218,7 @@ export default function IssueScreen({ route, navigation }) {
             {item.openingStock} {item.unit} available
           </Text>
         </View>
-        
+
         <View style={styles.itemTrailing}>
           {cartQty > 0 ? (
             <View style={styles.qtyContainer}>
@@ -212,8 +226,8 @@ export default function IssueScreen({ route, navigation }) {
                 <Ionicons name="remove" size={16} color={theme.text} />
               </TouchableOpacity>
               <Text style={styles.qtyText}>{cartQty}</Text>
-              <TouchableOpacity 
-                onPress={() => handleUpdateCart(item, 1)} 
+              <TouchableOpacity
+                onPress={() => handleUpdateCart(item, 1)}
                 style={[styles.qtyBtn, isMaxStock && { opacity: 0.3 }]}
                 disabled={isMaxStock}
               >
@@ -221,8 +235,8 @@ export default function IssueScreen({ route, navigation }) {
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity 
-              style={[styles.addButton, isOutOfStock && { backgroundColor: theme.border }]} 
+            <TouchableOpacity
+              style={[styles.addButton, isOutOfStock && { backgroundColor: theme.border }]}
               onPress={() => handleUpdateCart(item, 1)}
               disabled={isOutOfStock}
             >
@@ -235,7 +249,7 @@ export default function IssueScreen({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { paddingBottom: 0}]} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.container, { paddingBottom: 0 }]} edges={['top', 'left', 'right']}>
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => step === 2 && cart.length > 0 && !initialItemId ? setStep(1) : navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
@@ -329,29 +343,33 @@ export default function IssueScreen({ route, navigation }) {
             </View>
 
             {/* Returnable Toggle (Yes | No Buttons) */}
-            <View style={styles.switchContainer}>
-              <View style={{ flex: 1, paddingRight: 10 }}>
-                <Text style={styles.inputLabel}>Is this item returnable?</Text>
-                <Text style={styles.itemSub}>Will this item be brought back?</Text>
-              </View>
-
-              <View style={styles.toggleGroup}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Is this item returnable?</Text>
+              <View style={styles.segmentedControl}>
                 <TouchableOpacity
-                  style={[styles.toggleButton, isReturnable === true && styles.toggleButtonActive]}
-                  onPress={() => setIsReturnable(true)}
+                  style={[
+                    styles.segmentButton,
+                    !isReturnable && styles.segmentActive
+                  ]}
+                  onPress={() => setIsReturnable(false)}
                 >
-                  <Text style={[styles.toggleButtonText, isReturnable === true && styles.toggleButtonTextActive]}>
-                    Yes
-                  </Text>
+                  <Text style={[
+                    styles.segmentText,
+                    !isReturnable && styles.segmentTextActive
+                  ]}>No</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.toggleButton, isReturnable === false && styles.toggleButtonActive]}
-                  onPress={() => setIsReturnable(false)}
+                  style={[
+                    styles.segmentButton,
+                    isReturnable && styles.segmentActive
+                  ]}
+                  onPress={() => setIsReturnable(true)}
                 >
-                  <Text style={[styles.toggleButtonText, isReturnable === false && styles.toggleButtonTextActive]}>
-                    No
-                  </Text>
+                  <Text style={[
+                    styles.segmentText,
+                    isReturnable && styles.segmentTextActive
+                  ]}>Yes</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -359,13 +377,35 @@ export default function IssueScreen({ route, navigation }) {
             {isReturnable && (
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Due Date *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="DD/MM/YYYY"
-                  placeholderTextColor={theme.textMuted}
-                  value={dueDate}
-                  onChangeText={setDueDate}
-                />
+                <TouchableOpacity onPress={() => setShowDatePicker(true)} activeOpacity={0.7}>
+                  <View pointerEvents="none">
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Select Date"
+                      placeholderTextColor={theme.textMuted}
+                      value={dueDate}
+                      editable={false} // Prevents keyboard from popping up
+                    />
+                  </View>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color={theme.textMuted}
+                    style={{ position: 'absolute', right: 15, top: 15 }}
+                  />
+                </TouchableOpacity>
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onDateChange}
+                    minimumDate={new Date()}
+                    textColor={theme.light}
+                    themeVariant={theme.name}
+                  />
+                )}
               </View>
             )}
 
@@ -446,11 +486,11 @@ const getStyles = (theme) => StyleSheet.create({
   input: { backgroundColor: theme.inputBg, color: theme.text, borderRadius: 12, paddingHorizontal: 16, height: 52, fontSize: 15, borderColor: theme.inputBg + '10', borderWidth: 1 },
   textArea: { height: 80, paddingTop: 14, textAlignVertical: 'top' },
 
-  switchContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.inputBg, padding: 16, borderRadius: 12, marginBottom: 16, borderColor: theme.inputBg + '10', borderWidth: 1},
+  switchContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.inputBg, padding: 16, borderRadius: 12, marginBottom: 16, borderColor: theme.inputBg + '10', borderWidth: 1 },
 
   toggleGroup: {
     flexDirection: 'row',
-    backgroundColor: theme.primary, 
+    backgroundColor: theme.primary,
     borderRadius: 8,
     padding: 4,
   },
@@ -473,4 +513,38 @@ const getStyles = (theme) => StyleSheet.create({
 
   primaryButton: { backgroundColor: theme.primary, paddingVertical: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   primaryButtonText: { color: theme.text, fontSize: 16, fontWeight: 'bold' },
+  // Segmented Control (Yes/No Toggle)
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: theme.inputBg, // Matches your text inputs
+    borderRadius: 12,
+    padding: 4,
+    height: 52,
+    borderWidth: 1,
+    borderColor: theme.border + '30',
+  },
+  segmentButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  segmentActive: {
+    backgroundColor: theme.card, // Pops out slightly from the inputBg
+    // Add a tiny shadow for the active state
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  segmentText: {
+    color: theme.textMuted,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  segmentTextActive: {
+    color: theme.primary, // Highlights the selection in your theme primary color
+    fontWeight: 'bold',
+  },
 });
