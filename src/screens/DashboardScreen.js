@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import {
@@ -14,10 +13,27 @@ import {
   Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// Lucide Icons
+import {
+  AlertTriangle,
+  ArrowDownCircle,
+  ArrowRightLeft,
+  ArrowUpCircle,
+  CheckCircle,
+  ChevronRight,
+  Minus,
+  Plus,
+  Scan,
+  Trash2,
+  X,
+  Zap
+} from 'lucide-react-native';
+
 import { useTheme } from '../context/ThemeContext';
 import { fetchFromGAS, postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
-import { useInventory } from '../hooks/useInventory';
+import useInventoryStore from '../store/useInventoryStore';
 import { HapticHelper } from '../utils/haptics';
 import { UniversalAlert } from '../utils/UniversalAlert';
 
@@ -39,7 +55,7 @@ export default function DashboardScreen() {
   const [isDiscardedListModalVisible, setDiscardedListModalVisible] = useState(false);
 
   // Hook Initialization
-  const { inventory, loadInventory } = useInventory();
+  const { inventory, loadInventory } = useInventoryStore();
 
   const openReturnModal = (item) => {
     setSelectedReturnItem(item);
@@ -272,14 +288,14 @@ export default function DashboardScreen() {
   };
 
   // REUSABLE COMPONENTS
-  const ActionButton = ({ icon, label, onPress, color }) => (
+  const ActionButton = ({ Icon, label, onPress, color }) => (
     <TouchableOpacity
       style={[styles.actionButton, { backgroundColor: color + '15' }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
       <View style={[styles.actionIconCircle, { backgroundColor: color }]}>
-        <Ionicons name={icon} size={24} color="#fff" />
+        <Icon size={24} color="#fff" />
       </View>
       <Text style={styles.actionLabel}>{label}</Text>
     </TouchableOpacity>
@@ -302,7 +318,7 @@ export default function DashboardScreen() {
       {onPress && (
         <View style={styles.tapIndicator}>
           <Text style={{ color: highlightColor, fontSize: 10, fontWeight: 'bold' }}>TAP TO VIEW</Text>
-          <Ionicons name="chevron-forward" size={12} color={highlightColor} />
+          <ChevronRight size={12} color={highlightColor} />
         </View>
       )}
     </TouchableOpacity>
@@ -323,25 +339,25 @@ export default function DashboardScreen() {
         <View style={styles.quickActionsContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsScroll}>
             <ActionButton
-              icon="arrow-down-circle"
+              Icon={ArrowDownCircle}
               label="Stock In"
               color="#10B981"
               onPress={() => navigation.navigate('StockIn')}
             />
             <ActionButton
-              icon="arrow-up-circle"
+              Icon={ArrowUpCircle}
               label="Issue"
               color="#F59E0B"
               onPress={() => navigation.navigate('Issue')}
             />
             <ActionButton
-              icon="swap-horizontal"
+              Icon={ArrowRightLeft}
               label="Relocate"
               color="#3B82F6"
               onPress={() => navigation.navigate('Relocate')}
             />
             <ActionButton
-              icon="scan"
+              Icon={Scan}
               label="Audit"
               color="#8B5CF6"
               onPress={() => navigation.navigate('Scan')}
@@ -359,7 +375,7 @@ export default function DashboardScreen() {
                 value={data.summary?.totalItems}
                 highlightColor={theme.primary}
               />
-              <SummaryCard title="Items Issued" value={data.summary?.itemsIssued} highlightColor={'rgba(255, 81, 0, 0.68)'} onPress={() => setItemIssuedModalVisible(true)} />
+              <SummaryCard title="Items Issued" value={data.summary?.itemsIssued} highlightColor={'rgba(255, 81, 0, 0.6)'} onPress={() => setItemIssuedModalVisible(true)} />
             </View>
             <View style={styles.gridRow}>
               <SummaryCard title="Pending Returns" value={data.summary?.pendingReturns} highlightColor={theme.warning} />
@@ -393,7 +409,7 @@ export default function DashboardScreen() {
                       <Text style={styles.cardTitle}>{item.item}</Text>
                       {item.isUrgent && (
                         <View style={{ backgroundColor: '#F59E0B20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center' }}>
-                          <Ionicons name="flash" size={12} color="#F59E0B" />
+                          <Zap size={12} color="#F59E0B" />
                           <Text style={{ fontSize: 10, color: '#F59E0B', fontWeight: 'bold', marginLeft: 2 }}>URGENT</Text>
                         </View>
                       )}
@@ -428,7 +444,7 @@ export default function DashboardScreen() {
                           style={[styles.returnButton, { backgroundColor: theme.danger || '#EF4444', flexDirection: 'row', alignItems: 'center', gap: 4 }]}
                           onPress={() => handleMarkDiscarded(item)}
                         >
-                          <Ionicons name="trash" size={14} color="#FFF" />
+                          <Trash2 size={14} color="#FFF" />
                           <Text style={styles.returnButtonText}>Discard ({item.qty})</Text>
                         </TouchableOpacity>
                       </>
@@ -457,7 +473,7 @@ export default function DashboardScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Low Stock Alerts</Text>
               <TouchableOpacity onPress={() => setLowStockModalVisible(false)}>
-                <Ionicons name="close" size={24} color={theme.text} />
+                <X size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
             <Text style={styles.modalHint}>Long press an item to ignore its alert</Text>
@@ -475,7 +491,7 @@ export default function DashboardScreen() {
                     <Text style={styles.cardSub}>{item.location || 'Location Not Set'}</Text>
                   </View>
                   <View style={styles.warningBadge}>
-                    <Ionicons name="warning" size={16} color={theme.warning || '#F59E0B'} />
+                    <AlertTriangle size={16} color={theme.warning || '#F59E0B'} />
                     <Text style={styles.warningText}>{item.current} / {item.min}</Text>
                   </View>
                 </TouchableOpacity>
@@ -503,7 +519,7 @@ export default function DashboardScreen() {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Process Return</Text>
                 <TouchableOpacity onPress={() => setReturnModalVisible(false)}>
-                  <Ionicons name="close" size={24} color={theme.text} />
+                  <X size={24} color={theme.text} />
                 </TouchableOpacity>
               </View>
 
@@ -522,14 +538,14 @@ export default function DashboardScreen() {
                       style={{ padding: 12, paddingHorizontal: 16 }}
                       onPress={() => setReturnQty(Math.max(1, returnQty - 1))}
                     >
-                      <Ionicons name="remove" size={20} color={theme.text} />
+                      <Minus size={20} color={theme.text} />
                     </TouchableOpacity>
                     <Text style={{ color: theme.text, fontSize: 18, fontWeight: 'bold', minWidth: 40, textAlign: 'center' }}>{returnQty}</Text>
                     <TouchableOpacity
                       style={{ padding: 12, paddingHorizontal: 16 }}
                       onPress={() => setReturnQty(Math.min(selectedReturnItem.qty, returnQty + 1))}
                     >
-                      <Ionicons name="add" size={20} color={theme.text} />
+                      <Plus size={20} color={theme.text} />
                     </TouchableOpacity>
                   </View>
 
@@ -549,7 +565,7 @@ export default function DashboardScreen() {
                     style={{ backgroundColor: theme.primary, padding: 16, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
                     onPress={processReturnItem}
                   >
-                    <Ionicons name="checkmark-circle" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                    <CheckCircle size={20} color="#FFF" style={{ marginRight: 8 }} />
                     <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold' }}>
                       {returnQty === selectedReturnItem.qty ? "Return All" : `Return ${returnQty} & Log Reason`}
                     </Text>
@@ -573,7 +589,7 @@ export default function DashboardScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Returned History</Text>
               <TouchableOpacity onPress={() => setReturnedListModalVisible(false)}>
-                <Ionicons name="close" size={24} color={theme.text} />
+                <X size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
 
@@ -611,7 +627,7 @@ export default function DashboardScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Discarded History</Text>
               <TouchableOpacity onPress={() => setDiscardedListModalVisible(false)}>
-                <Ionicons name="close" size={24} color={theme.text} />
+                <X size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
 
@@ -649,7 +665,7 @@ export default function DashboardScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Items Issued</Text>
               <TouchableOpacity onPress={() => setItemIssuedModalVisible(false)}>
-                <Ionicons name="close" size={24} color={theme.text} />
+                <X size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
 

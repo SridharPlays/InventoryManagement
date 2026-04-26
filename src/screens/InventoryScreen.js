@@ -1,6 +1,7 @@
+// src/screens/InventoryScreen.js
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Image } from 'expo-image'; // High Performance Image
+import { Image } from 'expo-image';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,7 +16,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
-import { useInventory } from '../hooks/useInventory';
+
+import useInventoryStore from '../store/useInventoryStore';
+
 import { UniversalAlert } from '../utils/UniversalAlert';
 import BottomSheetModal from '../components/BottomSheetModal';
 import CustomDropdown from '../components/CustomDropdown';
@@ -33,15 +36,20 @@ function useDebounce(value, delay) {
 }
 
 export default function InventoryScreen({ navigation }) {
-  const { inventory: items, loading: refreshing, loadInventory } = useInventory();
-  const [isGrid, setIsGrid] = useState(false);
+  const { 
+    inventory: items, 
+    loading: refreshing, 
+    loadInventory, 
+    deleteItemLocally 
+  } = useInventoryStore();
 
+  const [isGrid, setIsGrid] = useState(false);
   const { theme } = useTheme();
   const styles = getStyles(theme);
 
   // FILTER STATES
   const [searchQuery, setSearchQuery] = useState('');
-  const debouncedSearchQuery = useDebounce(searchQuery, 300); // Optimized search
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [isFilterModalVisible, setFilterModalVisible] = useState(false);
   const [activeFloor, setActiveFloor] = useState('');
   const [activeCupboard, setActiveCupboard] = useState('');
@@ -56,7 +64,10 @@ export default function InventoryScreen({ navigation }) {
   const [editForm, setEditForm] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => { loadInventory(false); HapticHelper.lightImpact(); }, [loadInventory]);
+  useEffect(() => { 
+    loadInventory(false); 
+    HapticHelper.lightImpact(); 
+  }, [loadInventory]);
 
   // DYNAMIC OPTIONS GENERATOR
   const uniqueCategories = useMemo(() => Array.from(new Set(items.map(i => i.category).filter(Boolean))).sort(), [items]);
@@ -108,11 +119,20 @@ export default function InventoryScreen({ navigation }) {
       {
         text: "Delete", style: "destructive", onPress: async () => {
           setIsSaving(true);
+          
+          // Optimistically remove from UI
+          deleteItemLocally(itemToDelete.itemId);
+          
           const response = await postToGAS('deleteItem', { itemData: itemToDelete });
           if (response.success) {
             await StorageService.removeCachedData('getInventory');
+            // Background refresh to ensure perfect sync
             loadInventory(true);
             setSelectedItem(null);
+          } else {
+             // If failed, reload to get the item back
+             loadInventory(true);
+             UniversalAlert.alert("Error", "Failed to delete item.");
           }
           setIsSaving(false);
         }
@@ -163,6 +183,7 @@ export default function InventoryScreen({ navigation }) {
       if (response.success) {
         UniversalAlert.alert("Success", "Item updated successfully.");
         await StorageService.removeCachedData('getInventory');
+        // This globally updates the store, syncing it to Dashboard instantly
         loadInventory(true);
         setIsEditing(false);
       } else {
@@ -178,12 +199,7 @@ export default function InventoryScreen({ navigation }) {
   const renderInventoryItem = ({ item }) => {
     if (isGrid) {
       return (
-        <TouchableOpacity
-          style={styles.gridCardNew}
-          activeOpacity={0.8}
-          onPress={() => setSelectedItem(item)}
-          onLongPress={() => handleLongPress(item)} 
-        >
+        <TouchableOpacity style={styles.gridCardNew} activeOpacity={0.8} onPress={() => setSelectedItem(item)} onLongPress={() => handleLongPress(item)}>
           <Image source={item.imageUrl ? { uri: item.imageUrl } : require('../../assets/images/caps_logo.png')} style={styles.gridImageFull} contentFit="cover" cachePolicy="memory-disk" transition={200} />
           <View style={styles.gridOverlay}>
             <Text style={styles.gridItemName} numberOfLines={1}>{item.itemName}</Text>
@@ -222,20 +238,13 @@ export default function InventoryScreen({ navigation }) {
       <View style={styles.searchContainer}>
         <View style={styles.searchInputWrapper}>
           <Ionicons name="search" size={20} color={theme.textMuted} style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search items, IDs, or categories..."
-            placeholderTextColor={theme.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
+          <TextInput style={styles.searchInput} placeholder="Search items, IDs, or categories..." placeholderTextColor={theme.textMuted} value={searchQuery} onChangeText={setSearchQuery} />
           {searchQuery !== '' && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
               <Ionicons name="close-circle" size={20} color={theme.textMuted} style={styles.clearIcon} />
             </TouchableOpacity>
           )}
         </View>
-
         <TouchableOpacity style={[styles.filterButton, isFilterActive && styles.filterButtonActive]} onPress={() => { setTempFloor(activeFloor); setTempCupboard(activeCupboard); setFilterModalVisible(true); }}>
           <Ionicons name="filter" size={22} color={isFilterActive ? theme.text : theme.textMuted} />
           {isFilterActive && <View style={styles.activeFilterDot} />}
@@ -250,18 +259,12 @@ export default function InventoryScreen({ navigation }) {
         contentContainerStyle={[styles.listContainer, filteredItems.length === 0 && { flex: 1 }]}
         columnWrapperStyle={isGrid ? styles.gridRow : undefined}
         renderItem={renderInventoryItem}
-        
-        // Optimizations
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
-        windowSize={5}
-        removeClippedSubviews={true}
-
+        initialNumToRender={10} maxToRenderPerBatch={10} windowSize={5} removeClippedSubviews={true}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadInventory(true)} tintColor={theme.primary} />}
         ListEmptyComponent={!refreshing ? <Text style={styles.emptyText}>No items match your filters.</Text> : null}
       />
 
-      {/* REFACTORED: FILTER MODAL */}
+      {/* FILTER MODAL */}
       <BottomSheetModal visible={isFilterModalVisible} onClose={() => setFilterModalVisible(false)} title="Filter Inventory">
         <CustomDropdown label="Floor Location" placeholder="Select a floor..." options={uniqueFloors} selectedValue={tempFloor} onSelect={(val) => { setTempFloor(val); setTempCupboard(''); }} />
         <CustomDropdown label="Cupboard" placeholder="Select a cupboard..." options={availableCupboards} selectedValue={tempCupboard} onSelect={setTempCupboard} />
@@ -271,7 +274,7 @@ export default function InventoryScreen({ navigation }) {
         </View>
       </BottomSheetModal>
 
-      {/* REFACTORED: DETAILS MODAL */}
+      {/* DETAILS MODAL */}
       <BottomSheetModal visible={!!selectedItem} onClose={() => setSelectedItem(null)} title="Item Details" isScrollable>
         {selectedItem && (
           <>
@@ -306,7 +309,7 @@ export default function InventoryScreen({ navigation }) {
         )}
       </BottomSheetModal>
 
-      {/* REFACTORED: EDIT FORM MODAL */}
+      {/* EDIT FORM MODAL */}
       <BottomSheetModal visible={isEditing} onClose={() => setIsEditing(false)} title="Edit Item" isScrollable disabled={isSaving}>
          {editForm && (
             <View style={styles.editFormContainer}>

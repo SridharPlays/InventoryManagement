@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,12 +12,11 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+import useInventoryStore from '../store/useInventoryStore';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
-import { useInventory } from '../hooks/useInventory';
 import { HapticHelper } from '../utils/haptics';
 import { UniversalAlert } from '../utils/UniversalAlert';
 
@@ -28,7 +28,7 @@ export default function RequestItemScreen({ navigation }) {
   const styles = getStyles(theme);
 
   // Hook Initialization
-  const { inventory, loading, loadInventory } = useInventory();
+  const { inventory, loading, loadInventory } = useInventoryStore();
 
   // Filtering & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -158,7 +158,7 @@ export default function RequestItemScreen({ navigation }) {
         UniversalAlert.alert(
           "Request Submitted",
           `Successfully sent ${cartItems.length} items to the Admin for approval.`,
-          [{ text: "OK", onPress: () => { clearCart(); navigation.goBack(); } }]
+          [{ text: "OK", onPress: () => { clearCart(); } }]
         );
       } else {
         HapticHelper.error();

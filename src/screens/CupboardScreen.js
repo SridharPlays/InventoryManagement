@@ -19,9 +19,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
-import { useInventory } from '../hooks/useInventory';
 import { HapticHelper } from '../utils/haptics';
 import { UniversalAlert } from '../utils/UniversalAlert';
+import useInventoryStore from '../store/useInventoryStore'
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -128,7 +128,7 @@ export default function CupboardScreen({ route, navigation }) {
   const styles = getStyles(theme);
 
   // Hook Initialization
-  const { inventory, loading, loadInventory } = useInventory();
+  const { inventory, loading, loadInventory } = useInventoryStore();
 
   // Cart State
   const [cart, setCart] = useState({});

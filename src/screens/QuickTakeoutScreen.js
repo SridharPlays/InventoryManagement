@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
-import { useInventory } from '../hooks/useInventory';
+import useInventoryStore from '../store/useInventoryStore';
 import { HapticHelper } from '../utils/haptics';
 import { UniversalAlert } from '../utils/UniversalAlert';
 import { set } from '@react-native-firebase/app/dist/module/internal/web/firebaseDatabase';
@@ -33,7 +33,7 @@ export default function QuickTakeoutScreen({ navigation }) {
   const styles = getStyles(theme);
 
   // Hook Initialization
-  const { inventory, loading, loadInventory } = useInventory();
+  const { inventory, loading, loadInventory } = useInventoryStore();
 
   // Filtering & Search
   const [searchQuery, setSearchQuery] = useState('');

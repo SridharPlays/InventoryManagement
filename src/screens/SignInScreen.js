@@ -58,12 +58,15 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
     webClientId:
       "695463828535-0jdevib60jm9bhnr3l3r5frdsrdvqtaq.apps.googleusercontent.com",
     redirectUri: AuthSession.makeRedirectUri({
-      projectSettings: {
-        baseUrl: "https://auth.expo.io/@sridharplays/InventoryExpo",
-      },
-      useProxy: true,
+      baseUrl: "https://auth.expo.io/@sridharplays/InventoryExpo",
+      scheme: 'inventory-expo',
+      path: 'oauth2redirect/google'
     }),
   });
+
+  const handleGoogleSignIn = () => {
+    promptAsync({ useProxy: true }); 
+  };
 
   const registerForPushNotificationsAsync = async (userEmail) => {
     let token;
@@ -199,7 +202,7 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
             style={
               theme.name === 'light'
                 ? { width: 280, height: 120, resizeMode: "contain" }
-                : { width: 250, height: 120, resizeMode: "contain" } 
+                : { width: 250, height: 120, resizeMode: "contain" }
             }
           />
         </View>
@@ -283,14 +286,14 @@ export default function SignInScreen({ navigation, setToken, setUserData }) {
         <TouchableOpacity
           style={styles.socialButton}
           disabled={!request || isLoading}
-          // onPress={() => promptAsync()}
-          onPress={() => {
-            UniversalAlert.alert(
-              "Google Sign-In",
-              "Google Sign-In is under development.",
-            );
-            HapticHelper.lightImpact();
-          }}
+          onPress={() => handleGoogleSignIn()}
+          // onPress={() => {
+          //   UniversalAlert.alert(
+          //     "Google Sign-In",
+          //     "Google Sign-In is under development.",
+          //   );
+          //   HapticHelper.lightImpact();
+          // }}
         >
           <Image
             source={{

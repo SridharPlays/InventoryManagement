@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
-import { useInventory } from '../hooks/useInventory';
+import useInventoryStore from '../store/useInventoryStore';
 import { UniversalAlert } from '../utils/UniversalAlert';
 import BottomSheetModal from '../components/BottomSheetModal';
 import { MONTHS, YEARS } from '../constants/time';
@@ -22,7 +22,7 @@ import { useTheme } from '../context/ThemeContext';
 import { HapticHelper } from '../utils/haptics';
 
 export default function ReportScreen({ navigation }) {
-  const { inventory, loadInventory } = useInventory();
+  const { inventory, loadInventory } = useInventoryStore();
   const [isLoading, setIsLoading] = useState(false);
   const [userEmail, setUserEmail] = useState("");
 

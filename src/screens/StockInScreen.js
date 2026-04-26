@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme } from '../context/ThemeContext';
-import { useInventory } from '../hooks/useInventory';
+import useInventoryStore from '../store/useInventoryStore';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 import { HapticHelper } from '../utils/haptics';
@@ -49,7 +49,7 @@ export default function StockInScreen({ navigation }) {
     const [isOnline, setIsOnline] = useState(true);
 
     // Hook Initialization
-    const { inventory, loading: isFetchingItems, loadInventory } = useInventory();
+    const { inventory, loading: isFetchingItems, loadInventory } = useInventoryStore();
 
     useEffect(() => {
         loadInventory();

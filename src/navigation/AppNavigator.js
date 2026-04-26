@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
@@ -6,28 +5,32 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
+// Lucide Icons
+import { Bell, Home, Package, PlusCircle, Scan, User, Zap } from 'lucide-react-native';
+
 // Theme Context 
-import { useTheme } from '../context/ThemeContext'; 
+import { useTheme } from '../context/ThemeContext';
 
 // Screens
 import AlertsScreen from '../screens/AlertsScreen';
 import CupboardScreen from '../screens/CupboardScreen';
 import DashboardScreen from '../screens/DashboardScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import InventoryScreen from '../screens/InventoryScreen';
 import IssueScreen from '../screens/IssueScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import QuickTakeoutScreen from '../screens/QuickTakeoutScreen';
 import RelocateScreen from '../screens/RelocateScreen';
 import ReportScreen from '../screens/ReportScreen';
 import RequestItemScreen from '../screens/RequestItemScreen';
 import ScannerScreen from '../screens/ScannerScreen';
 import SignInScreen from '../screens/SignInScreen';
 import StockInScreen from '../screens/StockInScreen';
-import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
-import QuickTakeoutScreen from '../screens/QuickTakeoutScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
+// Bottom Tab Components
 // Bottom Tab Components
 function BottomTabs({ userData, setToken }) {
   const isAdmin = userData?.role === 'admin';
@@ -37,19 +40,28 @@ function BottomTabs({ userData, setToken }) {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: theme.primary,
-        tabBarInactiveTintColor: theme.textMuted, 
-        tabBarStyle: { backgroundColor: theme.card, borderTopColor: theme.border }, 
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-          if (route.name === 'Dashboard') iconName = focused ? 'home' : 'home-outline';
-          else if (route.name === 'Inventory') iconName = focused ? 'cube' : 'cube-outline';
-          else if (route.name === 'Scan') iconName = focused ? 'scan-circle' : 'scan-circle-outline';
-          else if (route.name === 'Alerts') iconName = focused ? 'notifications' : 'notifications-outline';
-          else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
-          else if (route.name === 'Request') iconName = focused ? 'add-circle' : 'add-circle-outline';
-          else if (route.name === 'QuickTakeout') iconName = focused ? 'flash' : 'flash-outline';
-          return <Ionicons name={iconName} size={size} color={color} />;
+        tabBarActiveTintColor: theme.primary, // Color when focused
+        tabBarInactiveTintColor: theme.textMuted, // Color when unfocused
+        tabBarStyle: { backgroundColor: theme.card, borderTopColor: theme.border, height: 80 },
+        tabBarIcon: ({ color, size }) => { // Removed 'focused' as we don't need it for fill anymore
+          let IconComponent;
+
+          if (route.name === 'Dashboard') IconComponent = Home;
+          else if (route.name === 'Inventory') IconComponent = Package;
+          else if (route.name === 'Scan') IconComponent = Scan;
+          else if (route.name === 'Alerts') IconComponent = Bell;
+          else if (route.name === 'Profile') IconComponent = User;
+          else if (route.name === 'Request') IconComponent = PlusCircle;
+          else if (route.name === 'QuickTakeout') IconComponent = Zap;
+
+          if (!IconComponent) return null;
+
+          return (
+            <IconComponent
+              size={size}
+              color={color} // This automatically handles the active/inactive stroke color
+            />
+          );
         },
       })}
     >
@@ -65,7 +77,7 @@ function BottomTabs({ userData, setToken }) {
           {(props) => <RequestItemScreen {...props} userData={userData} />}
         </Tab.Screen>
       )}
-      
+
       <Tab.Screen name="Scan" component={ScannerScreen} />
 
       {/* QUICK TAKEOUT TAB */}
@@ -88,8 +100,8 @@ function BottomTabs({ userData, setToken }) {
 export default function AppNavigator() {
   const [isLoading, setIsLoading] = useState(true);
   const [userToken, setUserToken] = useState(null);
-  const [userData, setUserData] = useState(null); 
-  
+  const [userData, setUserData] = useState(null);
+
   const { theme } = useTheme(); // Grab dynamic colors for Loading Screen
 
   // Check for existing login on app start

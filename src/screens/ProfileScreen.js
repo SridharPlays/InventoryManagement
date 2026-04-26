@@ -1,20 +1,36 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-// Add these to your imports at the top
 import * as ImagePicker from 'expo-image-picker';
 import { postToGAS } from '../services/api';
 
 import { Audio } from 'expo-av';
 import { BlurView } from 'expo-blur';
 import { useNavigation } from 'expo-router';
+
+// Lucide Icons
+import {
+  Camera,
+  ChevronRight,
+  Clock,
+  FileText,
+  HelpCircle,
+  LayoutGrid,
+  LogOut,
+  Palette,
+  ShieldCheck,
+  Trash2,
+  Vibrate,
+  X
+} from 'lucide-react-native';
+
 import { CAPS_APPS } from '../constants/apps';
 import { useTheme } from '../context/ThemeContext';
 import { StorageService } from '../services/storage';
 import { HapticHelper } from '../utils/haptics';
 import { UniversalAlert } from '../utils/UniversalAlert';
+import * as WebBrowser from 'expo-web-browser';
 
 export default function ProfileScreen({ userData, setToken }) {
   const { theme, isDarkMode, toggleTheme } = useTheme();
@@ -30,6 +46,10 @@ export default function ProfileScreen({ userData, setToken }) {
   const [tapCount, setTapCount] = useState(0);
   const [soundIndex, setSoundIndex] = useState(0);
   const soundRef = useRef(null);
+
+  const openWebsite = async (url) => {
+    await WebBrowser.openBrowserAsync(url);
+  };
 
   const navigate = useNavigation();
 
@@ -138,7 +158,7 @@ export default function ProfileScreen({ userData, setToken }) {
           const { sound } = await Audio.Sound.createAsync(soundsList[0]);
           soundRef.current = sound;
 
-          if(userData?.role !== "admin") {
+          if (userData?.role !== "admin") {
             await sound.playAsync();
           }
 
@@ -205,17 +225,17 @@ export default function ProfileScreen({ userData, setToken }) {
     ]);
   };
 
-  const ProfileItem = ({ icon, label, value, onPress, rightIcon = "chevron-forward" }) => (
-    <TouchableOpacity style={styles.profileItem} onPress={onPress}>
+  const ProfileItem = ({ Icon, label, value, onPress, RightIcon = ChevronRight }) => (
+    <TouchableOpacity style={styles.profileItem} onPress={onPress} disabled={!onPress}>
       <View style={styles.profileItemLeft}>
         <View style={styles.iconBox}>
-          <MaterialCommunityIcons name={icon} size={20} color={theme.text} />
+          {Icon && <Icon size={20} color={theme.text} />}
         </View>
         <Text style={styles.profileItemLabel}>{label}</Text>
       </View>
       <View style={styles.profileItemRight}>
         {value && <Text style={styles.profileItemValue}>{value}</Text>}
-        <Ionicons name={rightIcon} size={20} color={theme.textMuted} />
+        {RightIcon && <RightIcon size={20} color={theme.textMuted} />}
       </View>
     </TouchableOpacity>
   );
@@ -243,14 +263,14 @@ export default function ProfileScreen({ userData, setToken }) {
                   style={styles.avatar}
                 />
                 <View style={styles.editIconBadge}>
-                  <Ionicons name="camera" size={12} color="#fff" />
+                  <Camera size={12} color="#fff" />
                 </View>
               </>
             )}
           </TouchableOpacity>
 
           {/* User Info Area - Triggers the Easter Egg (handlePress) */}
-          <TouchableOpacity style={styles.userInfo} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.userInfo} activeOpacity={0.7} onPress={handlePress}>
             <Text style={styles.userName}>{userData?.name || 'Guest User'}</Text>
             <Text style={styles.userEmail}>{userData?.email || 'No email found'}</Text>
           </TouchableOpacity>
@@ -258,19 +278,19 @@ export default function ProfileScreen({ userData, setToken }) {
 
         <Text style={styles.sectionTitle}>About</Text>
         <View style={styles.cardGroup}>
-          <ProfileItem icon="file-document-outline" label="Terms of Use" />
+          <ProfileItem Icon={FileText} label="Terms of Use" onPress={() => openWebsite("https://caps.christuniversity.in/terms_of_use")} />
           <View style={styles.itemDivider} />
-          <ProfileItem icon="shield-check-outline" label="Privacy Policy" />
+          <ProfileItem Icon={ShieldCheck} label="Privacy Policy" onPress={() => openWebsite('https://caps.christuniversity.in/privacy_policy')}/>
         </View>
 
         <Text style={styles.sectionTitle}>App</Text>
         <View style={styles.cardGroup}>
-          <ProfileItem icon="help-circle-outline" label="Help & Support" onPress={() => setHelpModalVisible(true)} />
+          <ProfileItem Icon={HelpCircle} label="Help & Support" onPress={() => setHelpModalVisible(true)} />
           <View style={styles.itemDivider} />
           <View style={styles.profileItem}>
             <View style={styles.profileItemLeft}>
               <View style={styles.iconBox}>
-                <MaterialCommunityIcons name={"palette"} size={20} color={theme.text} />
+                <Palette size={20} color={theme.text} />
               </View>
               <Text style={styles.profileItemLabel}>Switch Theme</Text>
             </View>
@@ -286,7 +306,7 @@ export default function ProfileScreen({ userData, setToken }) {
           <View style={styles.profileItem}>
             <View style={styles.profileItemLeft}>
               <View style={styles.iconBox}>
-                <MaterialCommunityIcons name={"vibrate"} size={20} color={theme.text} />
+                <Vibrate size={20} color={theme.text} />
               </View>
               <Text style={styles.profileItemLabel}>Vibrations</Text>
             </View>
@@ -294,19 +314,19 @@ export default function ProfileScreen({ userData, setToken }) {
               trackColor={{ false: theme.border, true: theme.primary }}
               thumbColor={'#f4f3f4'}
               ios_backgroundColor="#3e3e3e"
-              onValueChange={toggleVibrations} // Use new handler
-              value={vibrationsEnabled}        // Use new state
+              onValueChange={toggleVibrations}
+              value={vibrationsEnabled}
             />
           </View>
           <View style={styles.itemDivider} />
-          <ProfileItem icon="grid" label="More Applications" onPress={() => setAppsModalVisible(true)} />
+          <ProfileItem Icon={LayoutGrid} label="More Applications" onPress={() => setAppsModalVisible(true)} />
         </View>
 
         <View style={[styles.cardGroup, { marginTop: 20 }]}>
           <TouchableOpacity style={styles.profileItem} onPress={handleClearCache}>
             <View style={styles.profileItemLeft}>
               <View style={styles.iconBox}>
-                <Ionicons name="trash-outline" size={20} color={theme.danger} />
+                <Trash2 size={20} color={theme.danger} />
               </View>
               <Text style={[styles.profileItemLabel, { color: theme.danger }]}>Clear Cache</Text>
             </View>
@@ -315,7 +335,7 @@ export default function ProfileScreen({ userData, setToken }) {
           <TouchableOpacity style={styles.profileItem} onPress={handleLogout}>
             <View style={styles.profileItemLeft}>
               <View style={styles.iconBox}>
-                <Ionicons name="log-out-outline" size={20} color={theme.danger} />
+                <LogOut size={20} color={theme.danger} />
               </View>
               <Text style={[styles.profileItemLabel, { color: theme.danger }]}>Log out</Text>
             </View>
@@ -354,7 +374,7 @@ export default function ProfileScreen({ userData, setToken }) {
               <View style={styles.bottomSheetHeaderTitleRow}>
                 <Text style={styles.bottomSheetTitle}>More CAPS Apps</Text>
                 <TouchableOpacity onPress={() => setAppsModalVisible(false)}>
-                  <Ionicons name="close" size={24} color={theme.textMuted} />
+                  <X size={24} color={theme.textMuted} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -369,7 +389,6 @@ export default function ProfileScreen({ userData, setToken }) {
                     if (!app.isDraft && userData?.role === 'admin') {
                       setAppsModalVisible(false);
                       navigate.navigate(app.redirectTo);
-                    } else {
                     }
                   }}
                 >
@@ -386,7 +405,7 @@ export default function ProfileScreen({ userData, setToken }) {
 
                     {app.isDraft && (
                       <View style={[styles.draftBadge, { borderColor: theme.border }]}>
-                        <Ionicons name="time-outline" size={12} color={theme.textMuted} style={{ marginRight: 4 }} />
+                        <Clock size={12} color={theme.textMuted} style={{ marginRight: 4 }} />
                         <Text style={[styles.draftBadgeText, { color: theme.textMuted }]}>Under Development</Text>
                       </View>
                     )}
@@ -415,7 +434,7 @@ export default function ProfileScreen({ userData, setToken }) {
           </View>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView >
+    </SafeAreaView>
   );
 }
 
@@ -433,9 +452,9 @@ const getStyles = (theme) => StyleSheet.create({
   userEmail: { color: theme.textMuted, fontSize: 13 },
   sectionTitle: { color: theme.textMuted, fontSize: 13, marginBottom: 10, marginLeft: 5 },
   cardGroup: { backgroundColor: theme.card, borderRadius: 16, marginBottom: 20, overflow: 'hidden' },
-  profileItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
+  profileItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12 },
   profileItemLeft: { flexDirection: 'row', alignItems: 'center' },
-  iconBox: { width: 32, height: 32, borderRadius: 8, backgroundColor: theme.inputBg, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  iconBox: { width: 40, height: 40, borderRadius: 8, backgroundColor: theme.inputBg, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
   profileItemLabel: { color: theme.text, fontSize: 15 },
   profileItemRight: { flexDirection: 'row', alignItems: 'center' },
   profileItemValue: { color: theme.textMuted, fontSize: 13, marginRight: 8 },

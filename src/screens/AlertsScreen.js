@@ -1,4 +1,3 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -8,6 +7,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -16,6 +16,21 @@ import { useTheme } from '../context/ThemeContext';
 import { fetchFromGAS, postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 import { HapticHelper } from '../utils/haptics';
+
+// Lucide Icons
+import {
+  CheckCheck,
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  Mail,
+  Minus,
+  Plus,
+  TrendingDown,
+  User,
+  XCircle,
+  Zap
+} from 'lucide-react-native';
 
 export default function AlertsScreen({ navigation }) {
   const { theme } = useTheme();
@@ -173,9 +188,12 @@ export default function AlertsScreen({ navigation }) {
     }
   };
 
-  const FilterChip = ({ label, active, type }) => (
+  const FilterChip = ({ label, active, type, color }) => (
     <TouchableOpacity
-      style={[styles.filterChip, active && styles.filterChipActive]}
+      style={[
+        styles.filterChip,
+        active && { backgroundColor: color, borderColor: color }
+      ]}
       onPress={() => setFilters(prev => ({ ...prev, [type]: !prev[type] }))}
     >
       <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{label}</Text>
@@ -213,7 +231,7 @@ export default function AlertsScreen({ navigation }) {
         {/* Settings */}
         <View style={styles.preferencesCard}>
           <View style={styles.prefIconBox}>
-            <MaterialCommunityIcons name="email-outline" size={24} color={theme.primary} />
+            <Mail size={24} color={theme.primary} />
           </View>
           <View style={styles.prefTextContainer}>
             <Text style={styles.prefTitle}>Email Notifications</Text>
@@ -230,11 +248,11 @@ export default function AlertsScreen({ navigation }) {
           )}
         </View>
 
-        {/* Filter Row */}
+        {/* Filter Row with distinct colors passed in */}
         <View style={styles.filterRow}>
-          <FilterChip label="Requests" active={filters.requests} type="requests" />
-          <FilterChip label="Low Stock" active={filters.lowStock} type="lowStock" />
-          <FilterChip label="Overdue" active={filters.returns} type="returns" />
+          <FilterChip label="Requests" active={filters.requests} type="requests" color={theme.primary} />
+          <FilterChip label="Low Stock" active={filters.lowStock} type="lowStock" color={theme.danger} />
+          <FilterChip label="Overdue" active={filters.returns} type="returns" color={theme.warning} />
         </View>
 
         {isLoading ? (
@@ -242,14 +260,14 @@ export default function AlertsScreen({ navigation }) {
         ) : (
           <View style={styles.alertsList}>
 
-            {/* 1. REQUESTS ALWAYS ON TOP (Grouped into Single Box per Person) */}
+            {/* 1. REQUESTS ALWAYS ON TOP */}
             {filters.requests && Object.entries(groupedRequests).map(([person, items], groupIndex) => (
-              <View key={`req_group_${groupIndex}`} style={[styles.groupedCard, { borderTopColor: theme.primary, borderTopWidth: 4 }]}>
+              <View key={`req_group_${groupIndex}`} style={[styles.groupedCard, { borderColor: theme.primary + '80', borderWidth: 2 }]}>
 
                 {/* Person Header */}
                 <View style={styles.groupedCardHeader}>
                   <View style={[styles.alertIconBg, { backgroundColor: theme.primary + '15', width: 32, height: 32, marginRight: 10 }]}>
-                    <Ionicons name="person-outline" size={16} color={theme.primary} />
+                    <User size={16} color={theme.primary} />
                   </View>
                   <View>
                     <Text style={styles.groupedCardTitle}>{person}</Text>
@@ -259,25 +277,89 @@ export default function AlertsScreen({ navigation }) {
 
                 {/* Person's Items */}
                 {items.map((item, index) => {
+                  const isExpanded = expandedReq === item.row;
                   const isLast = index === items.length - 1;
+
                   return (
-                    <View key={`ret_${index}`} style={[styles.itemRow, isLast && { borderBottomWidth: 0 }]}>
-                      <View style={styles.alertContent}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                          <Text style={styles.alertTitle}>{item.item}</Text>
-                          {item.isUrgent && (
-                            <View style={{ backgroundColor: '#F59E0B20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center' }}>
-                              <Ionicons name="flash" size={12} color="#F59E0B" />
-                              <Text style={{ fontSize: 10, color: '#F59E0B', fontWeight: 'bold', marginLeft: 2 }}>URGENT</Text>
-                            </View>
-                          )}
+                    <View key={`req_${item.row}`} style={[styles.itemRow, isLast && { borderBottomWidth: 0 }]}>
+
+                      {/* Clickable Header Row */}
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => handleExpandRequest(item)}
+                        style={styles.itemRowHeader}
+                      >
+                        <View style={styles.alertContent}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                            <Text style={styles.alertTitle}>{item.itemName || item.item}</Text>
+                            {item.isUrgent && (
+                              <View style={{ backgroundColor: '#F59E0B20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center' }}>
+                                <Zap size={12} color="#F59E0B" />
+                                <Text style={{ fontSize: 10, color: '#F59E0B', fontWeight: 'bold', marginLeft: 2 }}>URGENT</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.alertDesc}>Needs {item.qty} units ({item.date})</Text>
                         </View>
-                        <Text style={styles.alertDesc}>
-                          {item.isReturnable
-                            ? `Overdue by ${item.overdueDays} days.`
-                            : 'Pending Discard / Resolution.'}
-                        </Text>
-                      </View>
+                        {isExpanded ? (
+                          <ChevronUp size={20} color={theme.textMuted} />
+                        ) : (
+                          <ChevronDown size={20} color={theme.textMuted} />
+                        )}
+                      </TouchableOpacity>
+
+                      {/* Interactive Expandable Section */}
+                      {isExpanded && (
+                        <View style={styles.expandedSectionInner}>
+                          <Text style={styles.expandLabel}>Negotiate Quantity (Max: {item.qty})</Text>
+                          <View style={styles.stepperContainer}>
+                            <TouchableOpacity style={styles.stepperBtn} onPress={() => changeQty(-1, item.qty)}>
+                              <Minus size={20} color={theme.text} />
+                            </TouchableOpacity>
+                            <Text style={styles.stepperValue}>{approveQty}</Text>
+                            <TouchableOpacity style={styles.stepperBtn} onPress={() => changeQty(1, item.qty)}>
+                              <Plus size={20} color={theme.text} />
+                            </TouchableOpacity>
+                          </View>
+
+                          <Text style={styles.expandLabel}>Admin Remarks</Text>
+                          <TextInput
+                            style={styles.remarksInput}
+                            placeholder="Add a note (e.g., Short on stock)..."
+                            placeholderTextColor={theme.textMuted}
+                            value={remarks}
+                            onChangeText={setRemarks}
+                          />
+
+                          <View style={styles.actionButtonsRow}>
+                            <TouchableOpacity
+                              style={[styles.actionBtn, styles.approveBtn]}
+                              onPress={() => submitApproval(item.row)}
+                              disabled={isApproving || isDeclining}
+                            >
+                              {isApproving ? <ActivityIndicator color="#FFF" /> : (
+                                <>
+                                  <CheckCircle size={18} color="#FFF" style={{ marginRight: 6 }} />
+                                  <Text style={styles.actionBtnText}>Approve {approveQty}</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[styles.actionBtn, styles.declineBtn]}
+                              onPress={() => submitDecline(item.row)}
+                              disabled={isApproving || isDeclining}
+                            >
+                              {isDeclining ? <ActivityIndicator color="#FFF" /> : (
+                                <>
+                                  <XCircle size={18} color="#FFF" style={{ marginRight: 6 }} />
+                                  <Text style={styles.actionBtnText}>Decline</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      )}
                     </View>
                   );
                 })}
@@ -286,10 +368,10 @@ export default function AlertsScreen({ navigation }) {
 
             {/* 2. LOW STOCK */}
             {filters.lowStock && alerts.lowStock.map((item, index) => (
-              <View key={`low_${index}`} style={[styles.alertCard, { borderLeftColor: theme.danger, borderLeftWidth: 4 }]}>
+              <View key={`low_${index}`} style={[styles.alertCard, { borderColor: theme.danger + '80', borderWidth: 2 }]}>
                 <View style={styles.cardHeader}>
                   <View style={[styles.alertIconBg, { backgroundColor: theme.danger + '15' }]}>
-                    <Ionicons name="trending-down" size={20} color={theme.danger} />
+                    <TrendingDown size={20} color={theme.danger} />
                   </View>
                   <View style={styles.alertContent}>
                     <Text style={styles.alertTitle}>Low Stock: {item.itemName || item[1]}</Text>
@@ -301,11 +383,11 @@ export default function AlertsScreen({ navigation }) {
 
             {/* 3. OVERDUE RETURNS */}
             {filters.returns && Object.entries(groupedReturns).map(([person, items], groupIndex) => (
-              <View key={`ret_group_${groupIndex}`} style={[styles.groupedCard, { borderTopColor: theme.warning, borderTopWidth: 4 }]}>
+              <View key={`ret_group_${groupIndex}`} style={[styles.groupedCard, { borderColor: theme.warning + '80', borderWidth: 2 }]}>
 
                 <View style={styles.groupedCardHeader}>
                   <View style={[styles.alertIconBg, { backgroundColor: theme.warning + '15', width: 32, height: 32, marginRight: 10 }]}>
-                    <Ionicons name="person-outline" size={16} color={theme.warning} />
+                    <User size={16} color={theme.warning} />
                   </View>
                   <View>
                     <Text style={styles.groupedCardTitle}>{person}</Text>
@@ -331,7 +413,7 @@ export default function AlertsScreen({ navigation }) {
             {((!filters.requests && !filters.lowStock && !filters.returns) ||
               (alerts.lowStock.length === 0 && alerts.pendingReturns.length === 0 && alerts.requests.length === 0)) && (
                 <View style={styles.emptyContainer}>
-                  <Ionicons name="checkmark-done-circle-outline" size={60} color={theme.border} />
+                  <CheckCheck size={60} color={theme.border} />
                   <Text style={styles.emptyTitle}>All Caught Up!</Text>
                   <Text style={styles.emptySub}>No alerts match your current filters.</Text>
                 </View>
@@ -358,22 +440,21 @@ const getStyles = (theme) => StyleSheet.create({
   prefTitle: { color: theme.text, fontSize: 16, fontWeight: '700', marginBottom: 2 },
   prefSub: { color: theme.textMuted, fontSize: 12 },
 
-  // Filters
+  // Filters (Removed hardcoded primary color for active state)
   filterRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
-  filterChipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
   filterChipText: { color: theme.textMuted, fontSize: 13, fontWeight: '600' },
   filterChipTextActive: { color: '#FFF' },
 
   alertsList: { gap: 16 },
 
   // Single Items (e.g. Low Stock)
-  alertCard: { backgroundColor: theme.card, borderRadius: 16, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
+  alertCard: { backgroundColor: theme.card, borderRadius: 16, overflow: 'hidden' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', padding: 16 },
   alertIconBg: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
 
   // Grouped Box Containers
-  groupedCard: { backgroundColor: theme.card, borderRadius: 16, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
+  groupedCard: { backgroundColor: theme.card, borderRadius: 16, overflow: 'hidden' },
   groupedCardHeader: { flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: theme.inputBg, borderBottomWidth: 1, borderBottomColor: theme.border },
   groupedCardTitle: { color: theme.text, fontSize: 16, fontWeight: '700' },
   groupedCardSub: { color: theme.textMuted, fontSize: 12, marginTop: 2 },

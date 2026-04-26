@@ -16,7 +16,7 @@ import { Image } from 'expo-image';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 import { useTheme } from '../context/ThemeContext';
-import { useInventory } from '../hooks/useInventory';
+import useInventoryStore from '../store/useInventoryStore';
 import { HapticHelper } from '../utils/haptics';
 import { UniversalAlert } from '../utils/UniversalAlert';
 
@@ -84,7 +84,7 @@ export default function RelocateScreen({ route, navigation }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Hook Initialization
-    const { inventory, loading, loadInventory } = useInventory();
+    const { inventory, loading, loadInventory } = useInventoryStore();
 
     useEffect(() => {
         loadInventory();

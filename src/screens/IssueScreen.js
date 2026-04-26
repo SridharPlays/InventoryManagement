@@ -20,7 +20,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { postToGAS } from '../services/api';
 import { StorageService } from '../services/storage';
 import { useTheme } from '../context/ThemeContext';
-import { useInventory } from '../hooks/useInventory';
+import useInventoryStore from '../store/useInventoryStore';
 import { HapticHelper } from '../utils/haptics';
 import { UniversalAlert } from '../utils/UniversalAlert';
 
@@ -34,7 +34,7 @@ export default function IssueScreen({ route, navigation }) {
   const [userData, setUserData] = useState(null);
 
   // Hook Initialization
-  const { inventory, loading, loadInventory } = useInventory();
+  const { inventory, loading, loadInventory } = useInventoryStore();
 
   // Step 1: Browse & Cart, Step 2: Fill Form
   const [step, setStep] = useState(1);

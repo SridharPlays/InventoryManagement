@@ -10,7 +10,8 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.caps.inventory"
     },
     "android": {
       "package": "com.caps.inventory",
